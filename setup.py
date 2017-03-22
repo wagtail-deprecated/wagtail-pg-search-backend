@@ -2,6 +2,12 @@ import io
 
 from setuptools import find_packages, setup
 
+
+def read(fname):
+    with io.open(fname, encoding='utf-8') as f:
+        return f.read()
+
+
 setup(
     name='wagtail-pg-search-backend',
     version='1.0.0.dev0',
@@ -10,7 +16,7 @@ setup(
     zip_safe=False,
     url='https://github.com/leukeleu/wagtail-pg-search-backend',
     description='PostgreSQL full text search backend for Wagtail CMS',
-    long_description=io.open('README.rst').read(),
+    long_description=read('README.rst'),
     keywords=['wagtail', 'postgres', 'fulltext', 'search'],
     classifiers=[
         'Operating System :: OS Independent',
