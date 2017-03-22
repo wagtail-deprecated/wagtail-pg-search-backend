@@ -36,13 +36,20 @@ Install the package and dev requirements::
     pip install -e . -r requirements-dev.txt
 
 
-To run the tests for the current environment's Python version
+To run the unittests for the current environment's Python version
 and Wagtail run::
 
-    python setup.py test
+    make unittests
 
+To check the code for style errors run::
 
-To test against all supported versions of Python and Wagtail run::
+    make flaketest
+
+To combine these tasks run::
+
+    make
+
+To run the unittest against all supported versions of Python and Wagtail run::
 
     tox
 
