@@ -1,5 +1,6 @@
 from django.db.models import (
     Model, CharField, ForeignKey, TextField, QuerySet,
+    BigAutoField, BigIntegerField, AutoField, IntegerField,
 )
 from django.db.models.functions import Cast
 from django.utils.translation import ugettext_lazy as _
@@ -11,8 +12,8 @@ from django.contrib.postgres.search import SearchVectorField
 
 class IndexQuerySet(QuerySet):
     def for_models(self, *models):
-        return self.filter(
-            content_type__in=ContentType.objects.get_for_models(models))
+        content_types = ContentType.objects.get_for_models(*models).values()
+        return self.filter(content_type__in=content_types)
 
     def for_objects(self, *objs):
         return (self.for_models(*{obj._meta.model for obj in objs})
@@ -30,6 +31,15 @@ class IndexQuerySet(QuerySet):
             self.for_model(queryset.model).filter(object_id__in=(
                 queryset.annotate(text_pk=Cast('pk', TextField()))
                 .values('text_pk'))))
+
+    def pks(self):
+        cast_field = self.model._meta.pk
+        if isinstance(cast_field, BigAutoField):
+            cast_field = BigIntegerField()
+        elif isinstance(cast_field, AutoField):
+            cast_field = IntegerField()
+        return (self.annotate(typed_pk=Cast('object_id', cast_field))
+                .values_list('typed_pk', flat=True))
 
 
 class IndexEntry(Model):
