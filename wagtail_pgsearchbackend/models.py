@@ -1,6 +1,6 @@
 from django.db.models import (
-    Model, CharField, ForeignKey, TextField, QuerySet,
-    BigAutoField, BigIntegerField, AutoField, IntegerField,
+    Model, CharField, ForeignKey, TextField, QuerySet, BigAutoField,
+    BigIntegerField, AutoField, IntegerField, CASCADE,
 )
 from django.db.models.functions import Cast
 from django.utils.translation import ugettext_lazy as _
