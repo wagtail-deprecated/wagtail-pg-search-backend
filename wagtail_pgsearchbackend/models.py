@@ -4,6 +4,7 @@ from django.db.models import (
 )
 from django.db.models.functions import Cast
 from django.utils.translation import ugettext_lazy as _
+
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.fields import JSONField
@@ -45,7 +46,7 @@ class IndexQuerySet(QuerySet):
 class IndexEntry(Model):
     config = CharField(max_length=63, blank=True)
 
-    content_type = ForeignKey(ContentType)
+    content_type = ForeignKey(ContentType, on_delete=CASCADE)
     # We do not use an IntegerField since primary keys are not always integers.
     object_id = TextField()
     content_object = GenericForeignKey()
