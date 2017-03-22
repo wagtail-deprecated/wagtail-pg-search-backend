@@ -25,5 +25,5 @@ setup(
         'wagtail',
         'Django>=1.10'
     ],
-    test_suite='tests'
+    test_suite='runtests.runtests'
 )
