@@ -22,8 +22,9 @@ setup(
     ],
     license='MIT',
     install_requires=[
-        'wagtail',
-        'Django>=1.10'
+        'Django>=1.10',
+        'psycopg2',
+        'wagtail'
     ],
     test_suite='runtests.runtests'
 )
