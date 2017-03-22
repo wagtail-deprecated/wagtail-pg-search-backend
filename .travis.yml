@@ -1,0 +1,27 @@
+language: python
+cache: pip
+sudo: false
+
+python:
+  - 2.7
+  - 3.4
+  - 3.5
+
+env:
+  - DJANGO='>=1.10,<1.11' WAGTAIL='>=1.8,<1.9'
+  - DJANGO='>=1.10,<1.11' WAGTAIL='>=1.9,<1.10'
+  - DJANGO='>=1.11,<1.12' WAGTAIL='>=1.8,<1.9'
+  - DJANGO='>=1.11,<1.12' WAGTAIL='>=1.9,<1.10'
+
+services:
+  - postgresql: "9.2"
+
+before_script:
+  - psql -c 'create database wagtail_pgsearchbackend;' -U postgres
+
+install:
+  - pip install Django$DJANGO wagtail$WAGTAIL
+  - pip install -e . -r requirements-dev.txt
+
+script:
+  make test
