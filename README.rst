@@ -3,12 +3,35 @@ Wagtail PostgreSQL full text search backend
 
 A PostgreSQL full text search backend for Wagtail CMS.
 
+
+Installation
+------------
+
+To start using PostgreSQL full text search in your Wagtail
+project you'll need to do a litte bit of configuration.
+
+Add the following to the project's settings::
+
+    INSTALLED_APPS += ['wagtail_pgsearchbackend']
+
+    WAGTAILSEARCH_BACKENDS = {
+        'default': {
+            'BACKEND': 'wagtail_pgsearchbackend.backend',
+        }
+    }
+
+Then run migrations to add the required database tables, e.g.::
+
+    ./manage.py migrate
+
+
 Development
 -----------
 
 Install the package and dev requirements::
 
     pip install -e . -r requirements-dev.txt
+
 
 Testing
 ~~~~~~~
