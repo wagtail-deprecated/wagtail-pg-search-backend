@@ -61,7 +61,7 @@ class Index:
             if isinstance(field, SearchField):
                 value = field.get_value(obj)
                 if value:
-                    if boost:
+                    if boost and field.boost is not None:
                         # TODO: Handle float boost.
                         for i in range(round(field.boost)):
                             body.append(value)
