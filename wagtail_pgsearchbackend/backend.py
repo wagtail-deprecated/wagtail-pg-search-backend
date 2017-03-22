@@ -34,6 +34,9 @@ class Index:
     def add_model(self, model):
         pass
 
+    def refresh(self):
+        pass
+
     def delete_stale_entries(self):
         qs1 = IndexEntry.objects.for_model(self.model).pks()
         qs2 = self.model.objects.order_by().values('pk')
