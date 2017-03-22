@@ -33,10 +33,7 @@ Install the package and dev requirements::
     pip install -e . -r requirements-dev.txt
 
 
-Testing
-~~~~~~~
-
-To run the tests for the current environtment's Python version
+To run the tests for the current environment's Python version
 and Wagtail run::
 
     python setup.py test
