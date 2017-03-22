@@ -1,11 +1,12 @@
 from __future__ import unicode_literals
 
-from django.contrib.contenttypes.models import ContentType
-from django.contrib.postgres.search import SearchQuery
 from django.db.models import Q, TextField
 from django.db.models.functions import Cast
-from wagtail.wagtailsearch.backends.base import (
-    BaseSearchQuery, BaseSearchResults, BaseSearchBackend)
+
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.postgres.search import SearchQuery
+
+from wagtail.wagtailsearch.backends.base import BaseSearchBackend, BaseSearchQuery, BaseSearchResults
 from wagtail.wagtailsearch.index import SearchField
 
 from .models import IndexEntry
