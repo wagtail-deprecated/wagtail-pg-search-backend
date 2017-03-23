@@ -34,6 +34,6 @@ class Migration(migrations.Migration):
         ),
         migrations.AlterUniqueTogether(
             name='indexentry',
-            unique_together=set([('config', 'content_type', 'object_id')]),
+            unique_together=set([('content_type', 'object_id')]),
         ),
     ]
