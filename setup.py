@@ -11,6 +11,8 @@ def read(fname):
 setup(
     name='wagtail-pg-search-backend',
     version='1.0.0.dev0',
+    author='Bertrand Bordage',
+    author_email='bordage.bertrand@gmail.com',
     packages=find_packages(exclude=['tests']),
     include_package_data=True,
     zip_safe=False,
