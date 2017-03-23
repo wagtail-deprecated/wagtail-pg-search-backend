@@ -53,9 +53,6 @@ class IndexEntry(Model):
     object_id = TextField()
     content_object = GenericForeignKey()
 
-    title = TextField()
-    body = TextField(blank=True)
-
     body_search = SearchVectorField()
 
     objects = IndexQuerySet.as_manager()

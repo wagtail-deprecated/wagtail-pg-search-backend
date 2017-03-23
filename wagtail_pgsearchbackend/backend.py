@@ -109,8 +109,6 @@ class Index(object):
                 content_type=ContentType.objects.get_for_model(model),
                 object_id=force_text(obj.pk),
                 defaults=dict(
-                    title=force_text(obj),
-                    body=self.prepare_body(obj),
                     body_search=SearchVector(
                         Value(unidecode(self.prepare_body(obj, boost=True))),
                         config=config),

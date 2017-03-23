@@ -25,8 +25,6 @@ class Migration(migrations.Migration):
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('config', models.CharField(blank=True, max_length=63)),
                 ('object_id', models.TextField()),
-                ('title', models.TextField()),
-                ('body', models.TextField(blank=True)),
                 ('body_search', django.contrib.postgres.search.SearchVectorField()),
                 ('content_type', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='contenttypes.ContentType')),
             ],
