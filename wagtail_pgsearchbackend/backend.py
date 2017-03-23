@@ -100,23 +100,37 @@ class Index(object):
         return ' '.join(body)
 
     def add_item(self, obj):
-        models = list(obj._meta.parents)
-        models.append(obj._meta.model)
-        object_id = force_text(obj.pk)
-        search_vector = SearchVector(
-            Value(unidecode(self.prepare_body(obj))),
-            config=self.get_config())
-        for model in models:
-            IndexEntry.objects.update_or_create(
-                content_type=ContentType.objects.get_for_model(model),
-                object_id=object_id,
-                defaults={'body_search': search_vector},
-            )
+        self.add_items(obj._meta.model, [obj])
 
     def add_items(self, model, objs):
-        # TODO: Make something faster.
+        all_models = list(model._meta.parents)
+        all_models.append(model)
+        content_types = (ContentType.objects.get_for_models(*all_models)
+                         .values())
+        config = self.get_config()
         for obj in objs:
-            self.add_item(obj)
+            obj._object_id = force_text(obj.pk)
+            obj._search_vector = SearchVector(
+                Value(unidecode(self.prepare_body(obj))), config=config)
+        ids_and_objs = {obj._object_id: obj for obj in objs}
+        indexed_ids = frozenset(IndexEntry.objects.for_models(*all_models)
+                                .filter(object_id__in=ids_and_objs)
+                                .values_list('object_id', flat=True))
+        for indexed_id in indexed_ids:
+            obj = ids_and_objs[indexed_id]
+            IndexEntry.objects.filter(content_type__in=content_types,
+                                      object_id=obj._object_id) \
+                .update(body_search=obj._search_vector)
+        to_be_created = []
+        for object_id in ids_and_objs:
+            if object_id not in indexed_ids:
+                for content_type in content_types:
+                    to_be_created.append(IndexEntry(
+                        content_type=content_type,
+                        object_id=object_id,
+                        body_search=ids_and_objs[object_id]._search_vector,
+                    ))
+        IndexEntry.objects.bulk_create(to_be_created)
 
     def __str__(self):
         return self.name
