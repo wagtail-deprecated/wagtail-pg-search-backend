@@ -131,8 +131,8 @@ class Index(object):
 
 class PostgresSearchQuery(BaseSearchQuery):
     def _process_lookup(self, field, lookup, value):
-        return Q(**{field.get_attname(self.queryset.model)
-                    + '__' + lookup: value})
+        return Q(
+            **{field.get_attname(self.queryset.model) + '__' + lookup: value})
 
     def _connect_filters(self, filters, connector, negated):
         combine = AND if connector == 'AND' else OR
