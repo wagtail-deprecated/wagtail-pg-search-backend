@@ -42,6 +42,8 @@ class IndexQuerySet(QuerySet):
 
 
 class IndexEntry(Model):
+    # TODO: Add a check to verify that the bytes size (not unicode size)
+    #       of this field is not > 63.
     config = CharField(max_length=63, blank=True)
 
     content_type = ForeignKey(ContentType, on_delete=CASCADE)
