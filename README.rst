@@ -77,3 +77,9 @@ To run the unittest against all supported versions of Python and Wagtail run::
 
 The tox run will also create a coverage report combining the results
 of all runs. This report is located in ``htmlcov/index.html``.
+
+To run individual tests by name use the ``runtests.py`` script and give
+the dotted path the the test module(s), class(es) or method(s) that you want to
+test e.g.::
+
+    ./runtests.py tests.test_module.TestClass.test_method

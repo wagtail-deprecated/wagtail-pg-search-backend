@@ -12,7 +12,11 @@ def runtests():
     os.environ['DJANGO_SETTINGS_MODULE'] = 'tests.settings'
     django.setup()
     test_runner = get_runner(settings)
-    failures = test_runner().run_tests(['tests'])
+    if len(sys.argv) > 1:
+        tests = sys.argv[1:]
+    else:
+        tests = ['tests']
+    failures = test_runner().run_tests(tests)
     sys.exit(bool(failures))
 
 
