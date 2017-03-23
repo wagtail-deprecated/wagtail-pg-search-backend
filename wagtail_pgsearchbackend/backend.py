@@ -4,14 +4,13 @@ import operator
 from functools import partial, reduce
 
 import six
-
 from bs4 import BeautifulSoup
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.search import (
-    SearchQuery, SearchVector, SearchRank)
+    SearchQuery, SearchRank, SearchVector)
 from django.db import DEFAULT_DB_ALIAS, connections
-from django.db.models import Q, TextField, Value, F
+from django.db.models import F, Q, TextField, Value
 from django.db.models.functions import Cast
 from django.utils.encoding import force_text, python_2_unicode_compatible
 from django.utils.translation import get_language
@@ -97,7 +96,7 @@ class Index(object):
                 if value:
                     if boost and field.boost is not None:
                         # TODO: Handle float boost.
-                        for i in range(int(round(field.boost)) or 1):
+                        for _ in range(int(round(field.boost)) or 1):
                             body.append(value)
                     else:
                         body.append(value)
