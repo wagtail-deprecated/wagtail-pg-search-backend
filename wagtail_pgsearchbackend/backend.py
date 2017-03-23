@@ -5,7 +5,6 @@ from functools import partial, reduce
 
 import six
 from bs4 import BeautifulSoup
-from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.search import (
     SearchQuery, SearchRank, SearchVector)
@@ -13,7 +12,6 @@ from django.db import DEFAULT_DB_ALIAS, connections
 from django.db.models import F, Q, TextField, Value
 from django.db.models.functions import Cast
 from django.utils.encoding import force_text, python_2_unicode_compatible
-from django.utils.translation import get_language
 from unidecode import unidecode
 from wagtail.wagtailsearch.backends.base import (
     BaseSearchBackend, BaseSearchQuery, BaseSearchResults)
@@ -70,11 +68,9 @@ class Index(object):
             cursor.execute('DELETE FROM %s WHERE object_id IN (%s);'
                            % (IndexEntry._meta.db_table, pks_sql), params)
 
-    def get_config_for(self, language=''):
-        if not language:
-            language = get_language() or settings.LANGUAGE_CODE
-        return (self.backend.params.get('LANGUAGES_CONFIGS', {})
-                .get(language, DEFAULT_SEARCH_CONFIGURATION))
+    def get_config(self):
+        return self.backend.params.get(
+            'SEARCH_CONFIG', DEFAULT_SEARCH_CONFIGURATION)
 
     def prepare_value(self, value):
         if isinstance(value, six.string_types):
@@ -101,15 +97,10 @@ class Index(object):
                     else:
                         body.append(value)
                     # TODO: Handle RelatedFields.
-                    # TODO: Handle extra fields.
         return ' '.join(body)
 
     def add_item(self, obj):
-        language = getattr(obj, 'get_language', '')
-        if callable(language):
-            language = language()
-
-        config = self.get_config_for(language)
+        config = self.get_config()
         models = list(obj._meta.parents)
         models.append(obj._meta.model)
         for model in models:
@@ -182,7 +173,7 @@ class PostgresSearchQuery(BaseSearchQuery):
 class PostgresSearchResult(BaseSearchResults):
     def _do_search(self):
         config = self.backend.get_index_for_model(
-            self.query.queryset.model).get_config_for()
+            self.query.queryset.model).get_config()
         pks = self.query.get_pks(config)[self.start:self.stop]
         results = {result.pk: result
                    for result in self.query.queryset.filter(pk__in=pks)}
