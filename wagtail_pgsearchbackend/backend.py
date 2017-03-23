@@ -84,13 +84,13 @@ class Index(object):
                              for item in value.values())
         return force_text(value)
 
-    def prepare_body(self, obj, boost=False):
+    def prepare_body(self, obj):
         body = []
         for field in obj.get_search_fields():
             if isinstance(field, SearchField):
                 value = self.prepare_value(field.get_value(obj))
                 if value:
-                    if boost and field.boost is not None:
+                    if field.boost is not None:
                         # TODO: Handle float boost.
                         for _ in range(int(round(field.boost)) or 1):
                             body.append(value)
@@ -108,7 +108,7 @@ class Index(object):
                 object_id=force_text(obj.pk),
                 defaults=dict(
                     body_search=SearchVector(
-                        Value(unidecode(self.prepare_body(obj, boost=True))),
+                        Value(unidecode(self.prepare_body(obj))),
                         config=self.get_config()),
                 ),
             )
