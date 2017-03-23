@@ -25,7 +25,7 @@ def get_sql(queryset):
     return queryset.query.get_compiler(get_db_alias(queryset)).as_sql()
 
 
-class Index:
+class Index(object):
     def __init__(self, backend, model):
         self.backend = backend
         self.model = model
