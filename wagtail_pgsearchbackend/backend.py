@@ -135,15 +135,8 @@ class PostgresSearchQuery(BaseSearchQuery):
                     + '__' + lookup: value})
 
     def _connect_filters(self, filters, connector, negated):
-        if connector == 'AND':
-            q = Q(*filters)
-        elif connector == 'OR':
-            q = filters[0]
-            for filter in filters[1:]:
-                q |= filter
-        else:
-            return
-
+        combine = AND if connector == 'AND' else OR
+        q = combine(filters)
         return ~q if negated else q
 
     def get_search_query(self, config):
