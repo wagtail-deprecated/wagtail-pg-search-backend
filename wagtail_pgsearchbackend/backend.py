@@ -1,5 +1,9 @@
 from __future__ import unicode_literals
 
+import operator
+
+from functools import partial, reduce
+
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.search import SearchQuery, SearchVector
@@ -11,11 +15,16 @@ from wagtail.wagtailsearch.backends.base import (
 )
 from wagtail.wagtailsearch.index import SearchField
 
+from . import utils
 from .models import IndexEntry
 
 
 DEFAULT_SEARCH_CONFIGURATION = 'simple'
 
+# Reduce any iterable to a single value using a logical OR e.g. (a | b | ...)
+OR = partial(reduce, operator.or_)
+# Reduce any iterable to a single value using a logical AND e.g. (a & b & ...)
+AND = partial(reduce, operator.and_)
 
 def get_db_alias(queryset):
     return queryset._db or DEFAULT_DB_ALIAS
@@ -106,6 +115,13 @@ class Index(object):
 
 
 class PostgresSearchQuery(BaseSearchQuery):
+    def process_query(self, config):
+        combine = AND if self.operator == 'and' else OR
+        search_terms = utils.keyword_split(self.query_string)
+        search_query = combine(
+            (SearchQuery(q, config=config) for q in search_terms))
+        return Q(body_search=search_query)
+
     def _process_lookup(self, field, lookup, value):
         return Q(**{field.get_attname(self.queryset.model)
                     + '__' + lookup: value})
@@ -132,10 +148,9 @@ class PostgresSearchResult(BaseSearchResults):
 
         if self.query.query_string is not None:
             index_entries = index_entries.filter(
-                body_search=SearchQuery(
-                    self.query.query_string,
-                    config=(self.backend.get_index_for_model(queryset.model)
-                            .get_config_for())))
+                self.query.process_query(
+                    config=self.backend.get_index_for_model(
+                        queryset.model).get_config_for()))
             # TODO: Add ranking.
 
         return index_entries.pks()[self.start:self.stop]
