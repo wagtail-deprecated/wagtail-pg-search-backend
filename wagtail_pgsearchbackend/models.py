@@ -5,6 +5,7 @@ from django.db.models import (
     CASCADE, AutoField, BigAutoField, BigIntegerField, CharField, ForeignKey,
     IntegerField, Model, QuerySet, TextField)
 from django.db.models.functions import Cast
+from django.utils.encoding import force_text, python_2_unicode_compatible
 from django.utils.translation import ugettext_lazy as _
 
 
@@ -15,14 +16,15 @@ class IndexQuerySet(QuerySet):
 
     def for_objects(self, *objs):
         return (self.for_models(*{obj._meta.model for obj in objs})
-                .filter(object_id__in=[str(obj.pk) for obj in objs]))
+                .filter(object_id__in=[force_text(obj.pk) for obj in objs]))
 
     def for_model(self, model):
         return self.filter(
             content_type=ContentType.objects.get_for_model(model))
 
     def for_object(self, obj):
-        return self.for_model(obj._meta.model).filter(object_id=str(obj.pk))
+        return (self.for_model(obj._meta.model)
+                .filter(object_id=force_text(obj.pk)))
 
     def for_queryset(self, queryset):
         return (
@@ -40,6 +42,7 @@ class IndexQuerySet(QuerySet):
                 .values_list('typed_pk', flat=True))
 
 
+@python_2_unicode_compatible
 class IndexEntry(Model):
     # TODO: Add a check to verify that the bytes size (not unicode size)
     #       of this field is not > 63.

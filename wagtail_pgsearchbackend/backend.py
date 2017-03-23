@@ -13,7 +13,7 @@ from django.contrib.postgres.search import (
 from django.db import DEFAULT_DB_ALIAS, connections
 from django.db.models import Q, TextField, Value, F
 from django.db.models.functions import Cast
-from django.utils.encoding import force_text
+from django.utils.encoding import force_text, python_2_unicode_compatible
 from django.utils.translation import get_language
 from unidecode import unidecode
 from wagtail.wagtailsearch.backends.base import (
@@ -22,6 +22,8 @@ from wagtail.wagtailsearch.index import SearchField
 
 from . import utils
 from .models import IndexEntry
+
+# TODO: Add autocomplete.
 
 DEFAULT_SEARCH_CONFIGURATION = 'simple'
 
@@ -41,6 +43,7 @@ def get_sql(queryset):
     return queryset.query.get_compiler(get_db_alias(queryset)).as_sql()
 
 
+@python_2_unicode_compatible
 class Index(object):
     def __init__(self, backend, model):
         self.backend = backend
@@ -114,9 +117,9 @@ class Index(object):
             IndexEntry.objects.update_or_create(
                 config=config,
                 content_type=ContentType.objects.get_for_model(model),
-                object_id=str(obj.pk),
+                object_id=force_text(obj.pk),
                 defaults=dict(
-                    title=str(obj),
+                    title=force_text(obj),
                     body=self.prepare_body(obj),
                     body_search=SearchVector(
                         Value(unidecode(self.prepare_body(obj, boost=True))),
