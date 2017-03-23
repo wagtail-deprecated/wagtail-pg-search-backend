@@ -1,6 +1,10 @@
+#!/usr/bin/env python
+
 import io
 
 from setuptools import find_packages, setup
+
+from wagtail_pgsearchbackend import __version__
 
 
 def read(fname):
@@ -10,7 +14,7 @@ def read(fname):
 
 setup(
     name='wagtail-pg-search-backend',
-    version='1.0.0',
+    version=__version__,
     author='Bertrand Bordage',
     author_email='bordage.bertrand@gmail.com',
     packages=find_packages(exclude=['tests']),
