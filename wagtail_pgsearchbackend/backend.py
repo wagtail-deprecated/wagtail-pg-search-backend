@@ -21,10 +21,9 @@ from wagtail.wagtailsearch.index import SearchField
 
 from . import utils
 from .models import IndexEntry
+from .utils import get_ancestor_models
 
 # TODO: Add autocomplete.
-from wagtail_pgsearchbackend.utils import get_ancestor_models
-
 
 DEFAULT_SEARCH_CONFIGURATION = 'simple'
 
