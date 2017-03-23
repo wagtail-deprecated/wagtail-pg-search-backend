@@ -6,9 +6,10 @@ from functools import partial, reduce
 from bs4 import BeautifulSoup
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
-from django.contrib.postgres.search import SearchQuery, SearchVector
+from django.contrib.postgres.search import (
+    SearchQuery, SearchVector, SearchRank)
 from django.db import DEFAULT_DB_ALIAS, connections
-from django.db.models import Q, TextField, Value
+from django.db.models import Q, TextField, Value, F
 from django.db.models.functions import Cast
 from django.utils.translation import get_language
 from unidecode import unidecode
@@ -135,6 +136,8 @@ class PostgresSearchQuery(BaseSearchQuery):
             **{field.get_attname(self.queryset.model) + '__' + lookup: value})
 
     def _connect_filters(self, filters, connector, negated):
+        if not filters:
+            return Q()
         combine = AND if connector == 'AND' else OR
         q = combine(filters)
         return ~q if negated else q
@@ -163,7 +166,10 @@ class PostgresSearchQuery(BaseSearchQuery):
                     .values('pk_text'))
                 index_entries = index_entries.filter(
                     object_id__in=original_pks)
-            # TODO: Add ranking.
+            # TODO: Make another ranking system for searching specific fields.
+            index_entries = index_entries.annotate(
+                rank=SearchRank(F('body_search'), search_query)
+            ).order_by('-rank')
 
         return index_entries.pks()
 
