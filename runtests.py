@@ -12,7 +12,7 @@ def runtests():
     os.environ['DJANGO_SETTINGS_MODULE'] = 'tests.settings'
     django.setup()
     test_runner = get_runner(settings)
-    if len(sys.argv) > 1:
+    if sys.argv[0] != 'setup.py' and len(sys.argv) > 1:
         tests = sys.argv[1:]
     else:
         tests = ['tests']
