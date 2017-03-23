@@ -171,6 +171,7 @@ class PostgresSearchBackend(BaseSearchBackend):
     rebuilder_class = PostgresSearchRebuilder
 
     def __init__(self, params):
+        super(PostgresSearchBackend, self).__init__(params)
         self.params = params
 
     def get_index_for_model(self, model):
