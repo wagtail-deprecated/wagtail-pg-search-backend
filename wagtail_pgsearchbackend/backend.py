@@ -11,6 +11,7 @@ from django.db import connections, DEFAULT_DB_ALIAS
 from django.db.models import Q, Value, TextField
 from django.db.models.functions import Cast
 from django.utils.translation import get_language
+from unidecode import unidecode
 from wagtail.wagtailsearch.backends.base import (
     BaseSearchQuery, BaseSearchResults, BaseSearchBackend,
 )
@@ -116,7 +117,7 @@ class Index(object):
                     title=str(obj),
                     body=self.prepare_body(obj),
                     body_search=SearchVector(
-                        Value(self.prepare_body(obj, boost=True)),
+                        Value(unidecode(self.prepare_body(obj, boost=True))),
                         config=config),
                 ),
             )
@@ -149,7 +150,7 @@ class PostgresSearchQuery(BaseSearchQuery):
 
     def get_search_query(self, config):
         combine = AND if self.operator == 'and' else OR
-        search_terms = utils.keyword_split(self.query_string)
+        search_terms = utils.keyword_split(unidecode(self.query_string))
         return combine(SearchQuery(q, config=config) for q in search_terms)
 
     def get_pks(self, config):
@@ -171,7 +172,7 @@ class PostgresSearchQuery(BaseSearchQuery):
                     .values('pk_text'))
                 index_entries = index_entries.filter(
                     object_id__in=original_pks)
-                # TODO: Add ranking.
+            # TODO: Add ranking.
 
         return index_entries.pks()
 
