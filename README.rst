@@ -27,12 +27,24 @@ Add the following to the project's settings::
     WAGTAILSEARCH_BACKENDS = {
         'default': {
             'BACKEND': 'wagtail_pgsearchbackend.backend',
+            'SEARCH_CONFIG': 'english'
         }
     }
 
 Then run migrations to add the required database tables, e.g.::
 
     ./manage.py migrate
+
+
+Configuration
+-------------
+
+The ``SEARCH_CONFIG`` key takes a text search configuration name.
+This controls the stemming, stopwords etc. used when searching and
+indexing the database. To get a list of the available config names
+use this query::
+
+    SELECT cfgname FROM pg_catalog.pg_ts_config
 
 
 Development
