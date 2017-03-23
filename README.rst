@@ -10,12 +10,19 @@ A PostgreSQL full text search backend for Wagtail CMS.
 Installation
 ------------
 
-To start using PostgreSQL full text search in your Wagtail
-project you'll need to do a litte bit of configuration.
+PostgreSQL fulll text search requires PostgreSQL >= 9.4,
+Django >= 1.10 and Wagtail >= 1.8.
+
+To start using PostgreSQL full text search you'll need to do a
+little bit of configuration.
 
 Add the following to the project's settings::
 
-    INSTALLED_APPS += ['wagtail_pgsearchbackend']
+    INSTALLED_APPS = [
+        ...
+        'wagtail_pgsearchbackend'
+        ...
+    ]
 
     WAGTAILSEARCH_BACKENDS = {
         'default': {
