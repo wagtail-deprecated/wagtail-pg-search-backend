@@ -124,8 +124,9 @@ class PostgresSearchQuery(BaseSearchQuery):
         return Q(body_search=search_query)
 
     def _process_lookup(self, field, lookup, value):
-        return Q(**{field.get_attname(self.queryset.model)
-                    + '__' + lookup: value})
+        field_lookup = '{}__{}'.format(
+            field.get_attname(self.queryset.model), lookup)
+        return Q(**{field_lookup: value})
 
     def _connect_filters(self, filters, connector, negated):
         if connector == 'AND':
