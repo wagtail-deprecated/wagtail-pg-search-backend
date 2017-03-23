@@ -100,18 +100,16 @@ class Index(object):
         return ' '.join(body)
 
     def add_item(self, obj):
-        config = self.get_config()
         models = list(obj._meta.parents)
         models.append(obj._meta.model)
         for model in models:
             IndexEntry.objects.update_or_create(
-                config=config,
                 content_type=ContentType.objects.get_for_model(model),
                 object_id=force_text(obj.pk),
                 defaults=dict(
                     body_search=SearchVector(
                         Value(unidecode(self.prepare_body(obj, boost=True))),
-                        config=config),
+                        config=self.get_config()),
                 ),
             )
 

@@ -2,7 +2,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.search import SearchVectorField
 from django.db.models import (
-    CASCADE, AutoField, BigAutoField, BigIntegerField, CharField, ForeignKey,
+    CASCADE, AutoField, BigAutoField, BigIntegerField, ForeignKey,
     IntegerField, Model, QuerySet, TextField)
 from django.db.models.functions import Cast
 from django.utils.encoding import force_text, python_2_unicode_compatible
@@ -44,10 +44,6 @@ class IndexQuerySet(QuerySet):
 
 @python_2_unicode_compatible
 class IndexEntry(Model):
-    # TODO: Add a check to verify that the bytes size (not unicode size)
-    #       of this field is not > 63.
-    config = CharField(max_length=63, blank=True)
-
     content_type = ForeignKey(ContentType, on_delete=CASCADE)
     # We do not use an IntegerField since primary keys are not always integers.
     object_id = TextField()
@@ -58,7 +54,7 @@ class IndexEntry(Model):
     objects = IndexQuerySet.as_manager()
 
     class Meta:
-        unique_together = ('config', 'content_type', 'object_id')
+        unique_together = ('content_type', 'object_id')
         verbose_name = _('index entry')
         verbose_name_plural = _('index entries')
         # TODO: Add a GinIndex.
