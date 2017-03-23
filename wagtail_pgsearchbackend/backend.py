@@ -4,7 +4,6 @@ import operator
 from functools import partial, reduce
 
 import six
-from bs4 import BeautifulSoup
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.search import (
     SearchQuery, SearchRank, SearchVector)
@@ -12,6 +11,7 @@ from django.db import DEFAULT_DB_ALIAS, connections
 from django.db.models import F, Q, TextField, Value
 from django.db.models.functions import Cast
 from django.utils.encoding import force_text, python_2_unicode_compatible
+from django.utils.html import strip_tags
 from unidecode import unidecode
 from wagtail.wagtailsearch.backends.base import (
     BaseSearchBackend, BaseSearchQuery, BaseSearchResults)
@@ -75,7 +75,7 @@ class Index(object):
     def prepare_value(self, value):
         if isinstance(value, six.string_types):
             if '</' in value:
-                return BeautifulSoup(value, 'html5lib').text
+                return strip_tags(value)
             return value
         if isinstance(value, list):
             return ', '.join(self.prepare_value(item) for item in value)
