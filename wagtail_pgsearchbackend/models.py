@@ -1,6 +1,5 @@
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from django.contrib.postgres.fields import JSONField
 from django.contrib.postgres.search import SearchVectorField
 from django.db.models import (
     CASCADE, AutoField, BigAutoField, BigIntegerField, CharField, ForeignKey,
@@ -55,7 +54,6 @@ class IndexEntry(Model):
     body = TextField(blank=True)
 
     body_search = SearchVectorField()
-    extra = JSONField(default=dict)
 
     objects = IndexQuerySet.as_manager()
 

@@ -28,7 +28,6 @@ class Migration(migrations.Migration):
                 ('title', models.TextField()),
                 ('body', models.TextField(blank=True)),
                 ('body_search', django.contrib.postgres.search.SearchVectorField()),
-                ('extra', django.contrib.postgres.fields.jsonb.JSONField()),
                 ('content_type', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='contenttypes.ContentType')),
             ],
             options={

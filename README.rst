@@ -10,7 +10,7 @@ A PostgreSQL full text search backend for Wagtail CMS.
 Installation
 ------------
 
-PostgreSQL fulll text search requires PostgreSQL >= 9.4,
+PostgreSQL fulll text search requires PostgreSQL >= 9.2,
 Django >= 1.10 and Wagtail >= 1.8.
 
 To start using PostgreSQL full text search you'll need to do a
