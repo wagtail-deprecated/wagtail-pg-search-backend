@@ -43,6 +43,21 @@ Install the package and dev requirements::
     pip install -e . -r requirements-dev.txt
 
 
+Creating migrations
+~~~~~~~~~~~~~~~~~~~
+
+First create a database::
+
+    createdb -Upostgres wagtail_pgsearchbackend
+
+Then call makemigrations using the test settings::
+
+    django-admin makemigrations --settings=tests.settings
+
+
+Testing
+~~~~~~~
+
 To run the unittests for the current environment's Python version
 and Wagtail run::
 
