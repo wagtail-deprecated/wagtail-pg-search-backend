@@ -1,25 +1,23 @@
 from __future__ import unicode_literals
 
-from functools import partial, reduce
 import operator
+from functools import partial, reduce
 
 from bs4 import BeautifulSoup
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.search import SearchQuery, SearchVector
-from django.db import connections, DEFAULT_DB_ALIAS
-from django.db.models import Q, Value, TextField
+from django.db import DEFAULT_DB_ALIAS, connections
+from django.db.models import Q, TextField, Value
 from django.db.models.functions import Cast
 from django.utils.translation import get_language
 from unidecode import unidecode
 from wagtail.wagtailsearch.backends.base import (
-    BaseSearchQuery, BaseSearchResults, BaseSearchBackend,
-)
+    BaseSearchBackend, BaseSearchQuery, BaseSearchResults)
 from wagtail.wagtailsearch.index import SearchField
 
 from . import utils
 from .models import IndexEntry
-
 
 DEFAULT_SEARCH_CONFIGURATION = 'simple'
 

@@ -1,13 +1,12 @@
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.postgres.fields import JSONField
+from django.contrib.postgres.search import SearchVectorField
 from django.db.models import (
     CASCADE, AutoField, BigAutoField, BigIntegerField, CharField, ForeignKey,
     IntegerField, Model, QuerySet, TextField)
 from django.db.models.functions import Cast
 from django.utils.translation import ugettext_lazy as _
-
-from django.contrib.contenttypes.fields import GenericForeignKey
-from django.contrib.contenttypes.models import ContentType
-from django.contrib.postgres.fields import JSONField
-from django.contrib.postgres.search import SearchVectorField
 
 
 class IndexQuerySet(QuerySet):
