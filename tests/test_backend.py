@@ -1,5 +1,3 @@
-import unittest
-
 from django.test import TestCase
 
 from wagtail.wagtailsearch.tests.test_backends import BackendTests
