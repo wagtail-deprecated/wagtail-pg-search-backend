@@ -18,3 +18,12 @@ def keyword_split(keywords):
     """
     matches = re.findall(r'"([^"]+)"|\'([^\']+)\'|(\S+)', keywords)
     return [match[0] or match[1] or match[2] for match in matches]
+
+
+def get_ancestor_models(model):
+    """
+    This returns all ancestors of a model, including the model itself.
+    """
+    models = [model]
+    models.extend(model._meta.parents)
+    return models

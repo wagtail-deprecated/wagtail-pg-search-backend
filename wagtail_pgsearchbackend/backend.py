@@ -21,6 +21,8 @@ from . import utils
 from .models import IndexEntry
 
 # TODO: Add autocomplete.
+from wagtail_pgsearchbackend.utils import get_ancestor_models
+
 
 DEFAULT_SEARCH_CONFIGURATION = 'simple'
 
@@ -54,8 +56,10 @@ class Index(object):
         pass
 
     def delete_stale_entries(self):
-        qs1 = IndexEntry.objects.for_model(self.model).pks()
-        qs2 = self.model.objects.order_by().values('pk')
+        qs1 = IndexEntry.objects.for_model(self.model).values('object_id')
+        # The empty `order_by` removes the order for performance’s sake.
+        qs2 = self.model.objects.order_by().annotate(
+            pk_text=Cast('pk', TextField())).values('pk_text')
         sql1, params1 = get_sql(qs1)
         sql2, params2 = get_sql(qs2)
         pks_sql = '(%s) EXCEPT (%s)' % (sql1, sql2)
@@ -103,19 +107,18 @@ class Index(object):
         self.add_items(obj._meta.model, [obj])
 
     def add_items(self, model, objs):
-        all_models = list(model._meta.parents)
-        all_models.append(model)
-        content_types = (ContentType.objects.get_for_models(*all_models)
-                         .values())
+        content_types = (ContentType.objects
+                         .get_for_models(*get_ancestor_models(model)).values())
         config = self.get_config()
         for obj in objs:
             obj._object_id = force_text(obj.pk)
             obj._search_vector = SearchVector(
                 Value(unidecode(self.prepare_body(obj))), config=config)
         ids_and_objs = {obj._object_id: obj for obj in objs}
-        indexed_ids = frozenset(IndexEntry.objects.for_models(*all_models)
-                                .filter(object_id__in=ids_and_objs)
-                                .values_list('object_id', flat=True))
+        indexed_ids = frozenset(
+            IndexEntry.objects.filter(content_type__in=content_types,
+                                      object_id__in=ids_and_objs)
+            .values_list('object_id', flat=True))
         for indexed_id in indexed_ids:
             obj = ids_and_objs[indexed_id]
             IndexEntry.objects.filter(content_type__in=content_types,

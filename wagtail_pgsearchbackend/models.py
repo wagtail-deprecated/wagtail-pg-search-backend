@@ -8,6 +8,8 @@ from django.db.models.functions import Cast
 from django.utils.encoding import force_text, python_2_unicode_compatible
 from django.utils.translation import ugettext_lazy as _
 
+from .utils import get_ancestor_models
+
 
 class IndexQuerySet(QuerySet):
     def for_models(self, *models):
@@ -23,14 +25,15 @@ class IndexQuerySet(QuerySet):
             content_type=ContentType.objects.get_for_model(model))
 
     def for_object(self, obj):
-        return (self.for_model(obj._meta.model)
+        return (self.for_models(*get_ancestor_models(obj._meta.model))
                 .filter(object_id=force_text(obj.pk)))
 
     def for_queryset(self, queryset):
         return (
-            self.for_model(queryset.model).filter(object_id__in=(
-                queryset.annotate(text_pk=Cast('pk', TextField()))
-                .values('text_pk'))))
+            self.for_models(*get_ancestor_models(queryset.model)).filter(
+                object_id__in=(queryset.annotate(text_pk=Cast('pk',
+                                                              TextField()))
+                               .values('text_pk'))))
 
     def pks(self):
         cast_field = self.model._meta.pk
