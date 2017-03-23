@@ -102,15 +102,15 @@ class Index(object):
     def add_item(self, obj):
         models = list(obj._meta.parents)
         models.append(obj._meta.model)
+        object_id = force_text(obj.pk)
+        search_vector = SearchVector(
+            Value(unidecode(self.prepare_body(obj))),
+            config=self.get_config())
         for model in models:
             IndexEntry.objects.update_or_create(
                 content_type=ContentType.objects.get_for_model(model),
-                object_id=force_text(obj.pk),
-                defaults=dict(
-                    body_search=SearchVector(
-                        Value(unidecode(self.prepare_body(obj))),
-                        config=self.get_config()),
-                ),
+                object_id=object_id,
+                defaults={'body_search': search_vector},
             )
 
     def add_items(self, model, objs):
