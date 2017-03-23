@@ -91,7 +91,7 @@ class Index(object):
                 if value:
                     if boost and field.boost is not None:
                         # TODO: Handle float boost.
-                        for i in range(round(field.boost)):
+                        for i in range(int(round(field.boost)) or 1):
                             body.append(value)
                     else:
                         body.append(value)
