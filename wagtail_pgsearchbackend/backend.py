@@ -3,6 +3,8 @@ from __future__ import unicode_literals
 import operator
 from functools import partial, reduce
 
+import six
+
 from bs4 import BeautifulSoup
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
@@ -11,6 +13,7 @@ from django.contrib.postgres.search import (
 from django.db import DEFAULT_DB_ALIAS, connections
 from django.db.models import Q, TextField, Value, F
 from django.db.models.functions import Cast
+from django.utils.encoding import force_text
 from django.utils.translation import get_language
 from unidecode import unidecode
 from wagtail.wagtailsearch.backends.base import (
@@ -72,7 +75,7 @@ class Index(object):
                 .get(language, DEFAULT_SEARCH_CONFIGURATION))
 
     def prepare_value(self, value):
-        if isinstance(value, str):
+        if isinstance(value, six.string_types):
             if '</' in value:
                 return BeautifulSoup(value, 'html5lib').text
             return value
@@ -81,7 +84,7 @@ class Index(object):
         if isinstance(value, dict):
             return ', '.join(self.prepare_value(item)
                              for item in value.values())
-        return str(value)
+        return force_text(value)
 
     def prepare_body(self, obj, boost=False):
         body = []

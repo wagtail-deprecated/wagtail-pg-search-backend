@@ -30,6 +30,7 @@ setup(
     install_requires=[
         'Django>=1.10',
         'psycopg2',
+        'six',
         'wagtail'
     ],
     test_suite='runtests.runtests'
