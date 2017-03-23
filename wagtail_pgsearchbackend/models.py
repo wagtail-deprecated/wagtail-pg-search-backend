@@ -55,7 +55,7 @@ class IndexEntry(Model):
     body = TextField(blank=True)
 
     body_search = SearchVectorField()
-    extra = JSONField(default={})
+    extra = JSONField(default=dict)
 
     objects = IndexQuerySet.as_manager()
 
