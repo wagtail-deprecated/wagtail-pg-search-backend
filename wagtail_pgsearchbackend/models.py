@@ -62,6 +62,7 @@ class IndexEntry(Model):
         unique_together = ('config', 'content_type', 'object_id')
         verbose_name = _('index entry')
         verbose_name_plural = _('index entries')
+        # TODO: Add a GinIndex.
 
     def __str__(self):
         return '%s: %s' % (self.content_type.name, self.title)

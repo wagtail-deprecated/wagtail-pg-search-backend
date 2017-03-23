@@ -10,12 +10,3 @@ class TestPgSearchBackend(BackendTests, TestCase):
 
     def reset_index(self):
         self.backend.reset_index()
-
-    @unittest.expectedFailure
-    def test_individual_field(self):
-        """
-        Searching in individual fields is not possible using
-        an index model.
-
-        """
-        super(TestPgSearchBackend, self).test_individual_field()

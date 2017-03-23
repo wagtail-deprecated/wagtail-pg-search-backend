@@ -1,24 +1,24 @@
 from __future__ import unicode_literals
 
-import math
 import operator
 
 from functools import partial, reduce
 
 from django.conf import settings
-from django.db import DEFAULT_DB_ALIAS, connections
-from django.db.models import Q, Value
-from django.utils.translation import get_language
-
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.search import SearchQuery, SearchVector
-
+from django.db import connections, DEFAULT_DB_ALIAS
+from django.db.models import Q, Value, TextField
+from django.db.models.functions import Cast
+from django.utils.translation import get_language
 from wagtail.wagtailsearch.backends.base import (
-    BaseSearchBackend, BaseSearchQuery, BaseSearchResults)
+    BaseSearchQuery, BaseSearchResults, BaseSearchBackend,
+)
 from wagtail.wagtailsearch.index import SearchField
 
 from . import utils
 from .models import IndexEntry
+
 
 DEFAULT_SEARCH_CONFIGURATION = 'simple'
 
@@ -26,6 +26,8 @@ DEFAULT_SEARCH_CONFIGURATION = 'simple'
 OR = partial(reduce, operator.or_)
 # Reduce any iterable to a single value using a logical AND e.g. (a & b & ...)
 AND = partial(reduce, operator.and_)
+# Reduce any iterable to a single value using an addition
+ADD = partial(reduce, operator.add)
 
 
 def get_db_alias(queryset):
@@ -77,7 +79,8 @@ class Index(object):
                 if value:
                     if boost and field.boost is not None:
                         # TODO: Handle float boost.
-                        body.append(value * math.ceil(field.boost))
+                        for i in range(round(field.boost)):
+                            body.append(value)
                     else:
                         body.append(value)
                     # TODO: Handle RelatedFields.
@@ -116,17 +119,9 @@ class Index(object):
 
 
 class PostgresSearchQuery(BaseSearchQuery):
-    def process_query(self, config):
-        combine = AND if self.operator == 'and' else OR
-        search_terms = utils.keyword_split(self.query_string)
-        search_query = combine(
-            (SearchQuery(q, config=config) for q in search_terms))
-        return Q(body_search=search_query)
-
     def _process_lookup(self, field, lookup, value):
-        field_lookup = '{}__{}'.format(
-            field.get_attname(self.queryset.model), lookup)
-        return Q(**{field_lookup: value})
+        return Q(**{field.get_attname(self.queryset.model)
+                    + '__' + lookup: value})
 
     def _connect_filters(self, filters, connector, negated):
         if connector == 'AND':
@@ -140,25 +135,40 @@ class PostgresSearchQuery(BaseSearchQuery):
 
         return ~q if negated else q
 
+    def get_search_query(self, config):
+        combine = AND if self.operator == 'and' else OR
+        search_terms = utils.keyword_split(self.query_string)
+        return combine(SearchQuery(q, config=config) for q in search_terms)
 
-class PostgresSearchResult(BaseSearchResults):
-    def get_pks(self):
-        queryset = self.query.queryset.filter(
-            self.query._get_filters_from_queryset())
+    def get_pks(self, config):
+        queryset = self.queryset.filter(self._get_filters_from_queryset())
 
         index_entries = IndexEntry.objects.for_queryset(queryset)
 
-        if self.query.query_string is not None:
-            index_entries = index_entries.filter(
-                self.query.process_query(
-                    config=self.backend.get_index_for_model(
-                        queryset.model).get_config_for()))
-            # TODO: Add ranking.
+        if self.query_string is not None:
+            search_query = self.get_search_query(config=config)
+            if self.fields is None:
+                index_entries = index_entries.filter(body_search=search_query)
+            else:
+                original_pks = (
+                    self.queryset
+                    .annotate(search=ADD(SearchVector(field)
+                                         for field in self.fields))
+                    .filter(search=search_query)
+                    .annotate(pk_text=Cast('pk', TextField()))
+                    .values('pk_text'))
+                index_entries = index_entries.filter(
+                    object_id__in=original_pks)
+                # TODO: Add ranking.
 
-        return index_entries.pks()[self.start:self.stop]
+        return index_entries.pks()
 
+
+class PostgresSearchResult(BaseSearchResults):
     def _do_search(self):
-        pks = self.get_pks()
+        config = self.backend.get_index_for_model(
+            self.query.queryset.model).get_config_for()
+        pks = self.query.get_pks(config)[self.start:self.stop]
         results = {result.pk: result
                    for result in self.query.queryset.filter(pk__in=pks)}
         return [results[pk] for pk in pks if pk in results]
