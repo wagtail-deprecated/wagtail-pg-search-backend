@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 
+import math
 import operator
 
 from functools import partial, reduce
@@ -75,8 +76,7 @@ class Index(object):
                 if value:
                     if boost and field.boost is not None:
                         # TODO: Handle float boost.
-                        for i in range(round(field.boost)):
-                            body.append(value)
+                        body.append(value * math.ceil(field.boost))
                     else:
                         body.append(value)
                     # TODO: Handle RelatedFields.
