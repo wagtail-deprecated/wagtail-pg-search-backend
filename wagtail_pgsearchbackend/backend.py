@@ -6,19 +6,19 @@ import operator
 from functools import partial, reduce
 
 from django.conf import settings
-from django.contrib.contenttypes.models import ContentType
-from django.contrib.postgres.search import SearchQuery, SearchVector
-from django.db import connections, DEFAULT_DB_ALIAS
+from django.db import DEFAULT_DB_ALIAS, connections
 from django.db.models import Q, Value
 from django.utils.translation import get_language
+
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.postgres.search import SearchQuery, SearchVector
+
 from wagtail.wagtailsearch.backends.base import (
-    BaseSearchQuery, BaseSearchResults, BaseSearchBackend,
-)
+    BaseSearchBackend, BaseSearchQuery, BaseSearchResults)
 from wagtail.wagtailsearch.index import SearchField
 
 from . import utils
 from .models import IndexEntry
-
 
 DEFAULT_SEARCH_CONFIGURATION = 'simple'
 
@@ -26,6 +26,7 @@ DEFAULT_SEARCH_CONFIGURATION = 'simple'
 OR = partial(reduce, operator.or_)
 # Reduce any iterable to a single value using a logical AND e.g. (a & b & ...)
 AND = partial(reduce, operator.and_)
+
 
 def get_db_alias(queryset):
     return queryset._db or DEFAULT_DB_ALIAS
