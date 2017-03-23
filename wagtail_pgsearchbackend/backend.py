@@ -1,9 +1,9 @@
 from __future__ import unicode_literals
 
+from functools import partial, reduce
 import operator
 
-from functools import partial, reduce
-
+from bs4 import BeautifulSoup
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.search import SearchQuery, SearchVector
@@ -71,11 +71,23 @@ class Index(object):
         return (self.backend.params.get('LANGUAGES_CONFIGS', {})
                 .get(language, DEFAULT_SEARCH_CONFIGURATION))
 
+    def prepare_value(self, value):
+        if isinstance(value, str):
+            if '</' in value:
+                return BeautifulSoup(value, 'html5lib').text
+            return value
+        if isinstance(value, list):
+            return ', '.join(self.prepare_value(item) for item in value)
+        if isinstance(value, dict):
+            return ', '.join(self.prepare_value(item)
+                             for item in value.values())
+        return str(value)
+
     def prepare_body(self, obj, boost=False):
         body = []
         for field in obj.get_search_fields():
             if isinstance(field, SearchField):
-                value = field.get_value(obj)
+                value = self.prepare_value(field.get_value(obj))
                 if value:
                     if boost and field.boost is not None:
                         # TODO: Handle float boost.
