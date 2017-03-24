@@ -184,44 +184,70 @@ class PostgresSearchQuery(BaseSearchQuery):
         search_terms = keyword_split(unidecode(self.query_string))
         return combine(SearchQuery(q, config=config) for q in search_terms)
 
-    def get_pks(self, config):
+    def get_base_queryset(self):
         queryset = self.queryset.filter(self._get_filters_from_queryset())
+        # Removes order for performance’s sake.
+        return queryset.order_by()
 
-        index_entries = IndexEntry.objects.for_queryset(queryset)
+    def get_in_index_queryset(self, queryset, search_query):
+        return (IndexEntry.objects.for_queryset(queryset)
+                .filter(body_search=search_query))
 
-        if self.query_string is not None:
-            search_query = self.get_search_query(config=config)
-            if self.fields is None:
-                index_entries = index_entries.filter(body_search=search_query)
-            else:
-                original_pks = (
-                    self.queryset
-                    .annotate(search=ADD(SearchVector(field)
-                                         for field in self.fields))
-                    .filter(search=search_query)
-                    .annotate(pk_text=Cast('pk', TextField()))
-                    .values('pk_text'))
-                index_entries = index_entries.filter(
-                    object_id__in=original_pks)
-            # TODO: Make another ranking system for searching specific fields.
-            index_entries = index_entries.annotate(
-                rank=SearchRank(F('body_search'), search_query)
-            ).order_by('-rank')
+    def get_in_fields_queryset(self, queryset, search_query):
+        # TODO: Take boost into account.
+        return (queryset.annotate(_search_=ADD(SearchVector(field)
+                                               for field in self.fields))
+                .filter(_search_=search_query))
 
-        return index_entries.pks()
+    def search_count(self, config):
+        queryset = self.get_base_queryset()
+        search_query = self.get_search_query(config=config)
+        queryset = (self.get_in_index_queryset(queryset, search_query)
+                    if self.fields is None
+                    else self.get_in_fields_queryset(queryset, search_query))
+        return queryset.count()
+
+    def search_in_index(self, queryset, search_query, start, stop):
+        index_entries = self.get_in_index_queryset(queryset, search_query)
+        index_entries = index_entries.annotate(
+            rank=SearchRank(F('body_search'), search_query)
+        ).order_by('-rank')
+        pks = index_entries.pks()
+        pks_sql, params = get_sql(pks)
+        meta = queryset.model._meta
+        return queryset.model.objects.raw(
+            'SELECT * FROM (%s) AS pks(pk) '
+            'INNER JOIN %s ON %s = pks.pk '
+            'OFFSET %%s LIMIT %%s'
+            % (pks_sql, meta.db_table, meta.pk.get_attname_column()[1]),
+            params + (start, None if stop is None else stop - start))
+
+    def search_in_fields(self, queryset, search_query, start, stop):
+        return (self.get_in_fields_queryset(queryset, search_query)
+                .annotate(_rank_=SearchRank(F('_search_'), search_query))
+                .order_by('-_rank_'))[start:stop]
+
+    def search(self, config, start, stop):
+        queryset = self.get_base_queryset()
+        if self.query_string is None:
+            return queryset
+        search_query = self.get_search_query(config=config)
+        if self.fields is None:
+            return self.search_in_index(queryset, search_query, start, stop)
+        return self.search_in_fields(queryset, search_query, start, stop)
 
 
 class PostgresSearchResult(BaseSearchResults):
-    def _do_search(self):
-        config = self.backend.get_index_for_model(
+    def get_config(self):
+        return self.backend.get_index_for_model(
             self.query.queryset.model).get_config()
-        pks = self.query.get_pks(config)[self.start:self.stop]
-        results = {result.pk: result
-                   for result in self.query.queryset.filter(pk__in=pks)}
-        return [results[pk] for pk in pks if pk in results]
+
+    def _do_search(self):
+        return list(self.query.search(self.get_config(),
+                                      self.start, self.stop))
 
     def _do_count(self):
-        return self.get_pks().count()
+        return self.query.search_count(self.get_config())
 
 
 class PostgresSearchRebuilder(object):
