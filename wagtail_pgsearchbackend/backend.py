@@ -10,14 +10,14 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.search import (
     SearchQuery, SearchRank, SearchVector)
 from django.db import DEFAULT_DB_ALIAS, connections
-from django.db.models import F, Q, TextField, Value
+from django.db.models import F, Manager, Q, TextField, Value
 from django.db.models.functions import Cast
 from django.utils.encoding import force_text, python_2_unicode_compatible
 from django.utils.html import strip_tags
 from unidecode import unidecode
 from wagtail.wagtailsearch.backends.base import (
     BaseSearchBackend, BaseSearchQuery, BaseSearchResults)
-from wagtail.wagtailsearch.index import SearchField
+from wagtail.wagtailsearch.index import RelatedFields, SearchField
 
 from .models import IndexEntry
 from .utils import get_ancestor_models, keyword_split
@@ -88,20 +88,34 @@ class Index(object):
                              for item in value.values())
         return force_text(value)
 
+    def prepare_field(self, obj, field):
+        if isinstance(field, SearchField):
+            value = self.prepare_value(field.get_value(obj))
+            if field.boost is not None:
+                # TODO: Handle float boost.
+                boost = int(round(field.boost)) or 1
+                for _ in range(boost):
+                    yield value
+            yield value
+        elif isinstance(field, RelatedFields):
+            sub_obj = getattr(obj, field.field_name)
+            if callable(sub_obj):
+                sub_obj = sub_obj()
+            if isinstance(sub_obj, Manager):
+                sub_objs = sub_obj.all()
+            else:
+                sub_objs = [sub_obj]
+            values = []
+            for sub_obj in sub_objs:
+                for sub_field in field.fields:
+                    for value in self.prepare_field(sub_obj, sub_field):
+                        yield value
+                        values.append(value)
+
     def prepare_body(self, obj):
-        body = []
-        for field in obj.get_search_fields():
-            if isinstance(field, SearchField):
-                value = self.prepare_value(field.get_value(obj))
-                if value:
-                    if field.boost is not None:
-                        # TODO: Handle float boost.
-                        for _ in range(int(round(field.boost)) or 1):
-                            body.append(value)
-                    else:
-                        body.append(value)
-                    # TODO: Handle RelatedFields.
-        return ' '.join(body)
+        return ' '.join(filter(bool, [
+            value for field in obj.get_search_fields()
+            for value in self.prepare_field(obj, field)]))
 
     def add_item(self, obj):
         self.add_items(obj._meta.model, [obj])
