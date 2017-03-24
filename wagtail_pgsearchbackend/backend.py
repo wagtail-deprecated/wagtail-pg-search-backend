@@ -14,13 +14,12 @@ from django.db.models import F, Manager, Q, TextField, Value
 from django.db.models.functions import Cast
 from django.utils.encoding import force_text, python_2_unicode_compatible
 from django.utils.html import strip_tags
-from unidecode import unidecode
 from wagtail.wagtailsearch.backends.base import (
     BaseSearchBackend, BaseSearchQuery, BaseSearchResults)
 from wagtail.wagtailsearch.index import RelatedFields, SearchField
 
 from .models import IndexEntry
-from .utils import get_ancestor_models, keyword_split
+from .utils import get_ancestor_models, keyword_split, unidecode
 
 # TODO: Add autocomplete.
 
