@@ -99,6 +99,8 @@ class Index(object):
             yield value
         elif isinstance(field, RelatedFields):
             sub_obj = getattr(obj, field.field_name)
+            if sub_obj is None:
+                return
             if callable(sub_obj):
                 sub_obj = sub_obj()
             if isinstance(sub_obj, Manager):
