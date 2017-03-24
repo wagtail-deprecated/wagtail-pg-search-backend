@@ -246,7 +246,7 @@ class PostgresSearchQuery(BaseSearchQuery):
     def search(self, config, start, stop):
         queryset = self.get_base_queryset()
         if self.query_string is None:
-            return queryset
+            return queryset[start:stop]
         search_query = self.get_search_query(config=config)
         if self.fields is None:
             return self.search_in_index(queryset, search_query, start, stop)
