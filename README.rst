@@ -83,10 +83,10 @@ Performance
 ~~~~~~~~~~~
 
 The PostgreSQL search backend has been tried and tested on a few small
-to medium sized website and it's performance compares favorably to that
+to medium sized website and its performance compares favorably to that
 of ElasticSearch.
 
-Some noticable speed improvments are in place when using PostgreSQL >= 9.5.
+Some noticeable speed improvements are in place when using PostgreSQL >= 9.5.
 
 
 Development
