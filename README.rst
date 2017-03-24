@@ -73,8 +73,8 @@ Known limitations
 * ``SearchField.es_extra`` is not handled because it is specific
   to ElasticSearch.
 
-* ``SearchQuerySet.search`` limiting search to specific field(s) is only supported
-  for database fields, not methods.
+* ``SearchQuerySet.search`` limiting search to specific field(s) is only
+  supported for database fields, not methods.
 
 .. _ATOMIC_REBUILD: http://docs.wagtail.io/en/v1.9/topics/search/backends.html#atomic-rebuild
 
@@ -125,7 +125,8 @@ To combine these tasks run::
 
     make
 
-To run the unittest against all supported versions of Python and Wagtail run::
+To run the unittest against all supported versions of Python and
+Wagtail run::
 
     tox
 
@@ -133,7 +134,7 @@ The tox run will also create a coverage report combining the results
 of all runs. This report is located in ``htmlcov/index.html``.
 
 To run individual tests by name use the ``runtests.py`` script and give
-the dotted path the the test module(s), class(es) or method(s) that you want to
-test e.g.::
+the dotted path the the test module(s), class(es) or method(s) that you
+want to test e.g.::
 
     ./runtests.py tests.test_module.TestClass.test_method
