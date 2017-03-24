@@ -10,7 +10,8 @@ A PostgreSQL full text search backend for Wagtail CMS.
 Installation
 ------------
 
-PostgreSQL full text search in Wagtail requires PostgreSQL >= 9.2,
+PostgreSQL full text search in Wagtail requires PostgreSQL >= 9.2
+(noticable speed improvements are in place for PostgreSQL >= 9.5),
 Django >= 1.10 and Wagtail >= 1.8.
 
 First, install the module using::
@@ -48,6 +49,44 @@ indexing the database. To get a list of the available config names
 use this query::
 
     SELECT cfgname FROM pg_catalog.pg_ts_config
+
+
+Usage
+-----
+
+This backend implements the required methods to be compatible
+with most features mentioned in the the
+`Wagtail search docs`_.
+
+.. _Wagtail search docs: http://docs.wagtail.io/en/v1.9/topics/search/backends.html
+
+
+Known limitations
+~~~~~~~~~~~~~~~~~
+
+* ```ATOMIC_REBUILD`_`` behaviour is not implemented.
+
+* ``SearchField.partial_match`` behaviour is not implemented.
+
+* ``SearchField.boost`` does not handle floats. Boost values are rounded.
+
+* ``SearchField.es_extra`` is not handled because it is specific
+  to ElasticSearch.
+
+* ``SearchQuerySet.search`` limiting search to specific field(s) is only supported
+  for database fields, not methods.
+
+.. _ATOMIC_REBUILD: http://docs.wagtail.io/en/v1.9/topics/search/backends.html#atomic-rebuild
+
+
+Performance
+~~~~~~~~~~~
+
+The PostgreSQL search backend has been tried and tested on a few small
+to medium sized website and it's performance compares favorably to that
+of ElasticSearch.
+
+Some noticable speed improvments are in place when using PostgreSQL >= 9.5.
 
 
 Development
