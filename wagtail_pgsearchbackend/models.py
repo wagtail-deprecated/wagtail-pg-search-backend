@@ -61,7 +61,7 @@ class IndexEntry(Model):
         unique_together = ('content_type', 'object_id')
         verbose_name = _('index entry')
         verbose_name_plural = _('index entries')
-        # TODO: Add a GinIndex.
+        # TODO: Move here the GIN index from the migration.
 
     def __str__(self):
         return '%s: %s' % (self.content_type.name, self.title)
