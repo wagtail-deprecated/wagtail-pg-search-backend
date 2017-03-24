@@ -19,9 +19,8 @@ from wagtail.wagtailsearch.backends.base import (
     BaseSearchBackend, BaseSearchQuery, BaseSearchResults)
 from wagtail.wagtailsearch.index import SearchField
 
-from . import utils
 from .models import IndexEntry
-from .utils import get_ancestor_models
+from .utils import get_ancestor_models, keyword_split
 
 # TODO: Add autocomplete.
 
@@ -107,14 +106,27 @@ class Index(object):
     def add_item(self, obj):
         self.add_items(obj._meta.model, [obj])
 
-    def add_items(self, model, objs):
-        content_types = (ContentType.objects
-                         .get_for_models(*get_ancestor_models(model)).values())
-        config = self.get_config()
+    def add_items_upsert(self, connection, content_types, objs, config):
+        data = []
+        for content_type in content_types:
+            for obj in objs:
+                data.extend(
+                    (content_type.pk, obj._object_id, obj._search_vector))
+        row_template = "(%%s, %%s, to_tsvector('%s', %%s))" % config
+        data_template = ', '.join([row_template
+                                   for _ in range(len(data) // 3)])
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO %s(content_type_id, object_id, body_search)
+                (VALUES %s)
+                ON CONFLICT (content_type_id, object_id)
+                DO UPDATE SET body_search = EXCLUDED.body_search
+                """ % (IndexEntry._meta.db_table, data_template), data)
+
+    def add_items_update_then_create(self, content_types, objs, config):
         for obj in objs:
-            obj._object_id = force_text(obj.pk)
-            obj._search_vector = SearchVector(
-                Value(unidecode(self.prepare_body(obj))), config=config)
+            obj._search_vector = SearchVector(Value(obj._search_vector,
+                                                    config=config))
         ids_and_objs = {obj._object_id: obj for obj in objs}
         indexed_ids = frozenset(
             IndexEntry.objects.filter(content_type__in=content_types,
@@ -136,6 +148,21 @@ class Index(object):
                     ))
         IndexEntry.objects.bulk_create(to_be_created)
 
+    def add_items(self, model, objs):
+        content_types = (ContentType.objects
+                         .get_for_models(*get_ancestor_models(model)).values())
+        config = self.get_config()
+        for obj in objs:
+            obj._object_id = force_text(obj.pk)
+            obj._search_vector = unidecode(self.prepare_body(obj))
+        # TODO: Get the DB alias another way.
+        db_alias = DEFAULT_DB_ALIAS
+        connection = connections[db_alias]
+        if connection.pg_version >= 90500:  # PostgreSQL >= 9.5
+            self.add_items_upsert(connection, content_types, objs, config)
+        else:
+            self.add_items_update_then_create(content_types, objs, config)
+
     def __str__(self):
         return self.name
 
@@ -154,7 +181,7 @@ class PostgresSearchQuery(BaseSearchQuery):
 
     def get_search_query(self, config):
         combine = AND if self.operator == 'and' else OR
-        search_terms = utils.keyword_split(unidecode(self.query_string))
+        search_terms = keyword_split(unidecode(self.query_string))
         return combine(SearchQuery(q, config=config) for q in search_terms)
 
     def get_pks(self, config):

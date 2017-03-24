@@ -52,6 +52,7 @@ class IndexEntry(Model):
     object_id = TextField()
     content_object = GenericForeignKey()
 
+    # TODO: Add per-object boosting.
     body_search = SearchVectorField()
 
     objects = IndexQuerySet.as_manager()
