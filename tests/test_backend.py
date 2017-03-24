@@ -18,7 +18,7 @@ class TestPgSearchBackend(BackendTests, TestCase):
                          {self.testa, self.testb, self.testc.searchtest_ptr,
                           self.testd.searchtest_ptr})
 
-        # But now, we can’t find anything because the index is empty.
+        # But now, we can't find anything because the index is empty.
         results = self.backend.search('hello', SearchTest)
         self.assertSetEqual(set(results), set())
         results = self.backend.search('world', SearchTest)
