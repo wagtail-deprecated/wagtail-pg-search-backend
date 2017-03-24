@@ -1,5 +1,12 @@
 import re
 
+try:
+    # Only use the GPLv2 licensed unidecode if it's installed.
+    from unidecode import unidecode
+except ImportError:
+    def unidecode(value):
+        return value
+
 
 def keyword_split(keywords):
     """
