@@ -125,8 +125,8 @@ class Index(object):
 
     def add_items_update_then_create(self, content_types, objs, config):
         for obj in objs:
-            obj._search_vector = SearchVector(Value(obj._search_vector,
-                                                    config=config))
+            obj._search_vector = SearchVector(Value(obj._search_vector),
+                                              config=config)
         ids_and_objs = {obj._object_id: obj for obj in objs}
         indexed_ids = frozenset(
             IndexEntry.objects.filter(content_type__in=content_types,
