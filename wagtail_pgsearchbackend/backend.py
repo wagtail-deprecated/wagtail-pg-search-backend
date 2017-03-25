@@ -19,7 +19,8 @@ from wagtail.wagtailsearch.backends.base import (
 from wagtail.wagtailsearch.index import RelatedFields, SearchField
 
 from .models import IndexEntry
-from .utils import get_ancestor_models, keyword_split, unidecode
+from .utils import (
+    WEIGHTS_VALUES, get_ancestor_models, get_weight, keyword_split, unidecode)
 
 # TODO: Add autocomplete.
 
@@ -72,8 +73,8 @@ class Index(object):
                            % (IndexEntry._meta.db_table, pks_sql), params)
 
     def get_config(self):
-        return self.backend.params.get(
-            'SEARCH_CONFIG', DEFAULT_SEARCH_CONFIGURATION)
+        return self.backend.params.get('SEARCH_CONFIG',
+                                       DEFAULT_SEARCH_CONFIGURATION)
 
     def prepare_value(self, value):
         if isinstance(value, six.string_types):
@@ -87,15 +88,11 @@ class Index(object):
                              for item in value.values())
         return force_text(value)
 
-    def prepare_field(self, obj, field):
+    def prepare_field(self, obj, field, config):
         if isinstance(field, SearchField):
-            value = self.prepare_value(field.get_value(obj))
-            if field.boost is not None:
-                # TODO: Handle float boost.
-                boost = int(round(field.boost)) or 1
-                for _ in range(boost):
-                    yield value
-            yield value
+            yield SearchVector(
+                Value(unidecode(self.prepare_value(field.get_value(obj)))),
+                weight=get_weight(field.boost), config=config)
         elif isinstance(field, RelatedFields):
             sub_obj = getattr(obj, field.field_name)
             if sub_obj is None:
@@ -106,42 +103,42 @@ class Index(object):
                 sub_objs = sub_obj.all()
             else:
                 sub_objs = [sub_obj]
-            values = []
             for sub_obj in sub_objs:
                 for sub_field in field.fields:
-                    for value in self.prepare_field(sub_obj, sub_field):
+                    for value in self.prepare_field(sub_obj, sub_field,
+                                                    config):
                         yield value
-                        values.append(value)
 
-    def prepare_body(self, obj):
-        return ' '.join(filter(bool, [
-            value for field in obj.get_search_fields()
-            for value in self.prepare_field(obj, field)]))
+    def prepare_body(self, obj, config):
+        config = Value(config)
+        return ADD([value for field in obj.get_search_fields()
+                    for value in self.prepare_field(obj, field, config)])
 
     def add_item(self, obj):
-        self.add_items(obj._meta.model, [obj])
+        self.add_items(self.model, [obj])
 
-    def add_items_upsert(self, connection, content_types, objs, config):
-        data = []
+    def add_items_upsert(self, connection, content_types, objs):
+        vectors_sql = []
+        data_params = []
+        whatever_compiler = (self.model.objects.all().query
+                             .get_compiler(connection=connection))
         for content_type in content_types:
             for obj in objs:
-                data.extend(
-                    (content_type.pk, obj._object_id, obj._search_vector))
-        row_template = "(%%s, %%s, to_tsvector('%s', %%s))" % config
-        data_template = ', '.join([row_template
-                                   for _ in range(len(data) // 3)])
+                sql, params = obj._search_vector.as_sql(whatever_compiler,
+                                                        connection)
+                vectors_sql.append(sql)
+                data_params.extend((content_type.pk, obj._object_id))
+                data_params.extend(params)
+        data_sql = ', '.join(['(%%s, %%s, %s)' % s for s in vectors_sql])
         with connection.cursor() as cursor:
             cursor.execute("""
                 INSERT INTO %s(content_type_id, object_id, body_search)
                 (VALUES %s)
                 ON CONFLICT (content_type_id, object_id)
                 DO UPDATE SET body_search = EXCLUDED.body_search
-                """ % (IndexEntry._meta.db_table, data_template), data)
+                """ % (IndexEntry._meta.db_table, data_sql), data_params)
 
-    def add_items_update_then_create(self, content_types, objs, config):
-        for obj in objs:
-            obj._search_vector = SearchVector(Value(obj._search_vector),
-                                              config=config)
+    def add_items_update_then_create(self, content_types, objs):
         ids_and_objs = {obj._object_id: obj for obj in objs}
         indexed_ids = frozenset(
             IndexEntry.objects.filter(content_type__in=content_types,
@@ -169,14 +166,14 @@ class Index(object):
         config = self.get_config()
         for obj in objs:
             obj._object_id = force_text(obj.pk)
-            obj._search_vector = unidecode(self.prepare_body(obj))
+            obj._search_vector = self.prepare_body(obj, config)
         # TODO: Get the DB alias another way.
         db_alias = DEFAULT_DB_ALIAS
         connection = connections[db_alias]
         if connection.pg_version >= 90500:  # PostgreSQL >= 9.5
-            self.add_items_upsert(connection, content_types, objs, config)
+            self.add_items_upsert(connection, content_types, objs)
         else:
-            self.add_items_update_then_create(content_types, objs, config)
+            self.add_items_update_then_create(content_types, objs)
 
     def __str__(self):
         return self.name
@@ -208,11 +205,20 @@ class PostgresSearchQuery(BaseSearchQuery):
         return (IndexEntry.objects.for_queryset(queryset)
                 .filter(body_search=search_query))
 
+    def get_boost(self, field_name):
+        # TODO: Handle related fields.
+        for field in self.queryset.model.get_search_fields():
+            if field.field_name == field_name:
+                return field.boost
+
     def get_in_fields_queryset(self, queryset, search_query):
-        # TODO: Take boost into account.
-        return (queryset.annotate(_search_=ADD(SearchVector(field)
-                                               for field in self.fields))
-                .filter(_search_=search_query))
+        return (
+            queryset.annotate(
+                _search_=ADD(
+                    SearchVector(field, config=search_query.config,
+                                 weight=get_weight(self.get_boost(field)))
+                    for field in self.fields))
+            .filter(_search_=search_query))
 
     def search_count(self, config):
         queryset = self.get_base_queryset()
@@ -225,7 +231,9 @@ class PostgresSearchQuery(BaseSearchQuery):
     def search_in_index(self, queryset, search_query, start, stop):
         index_entries = self.get_in_index_queryset(queryset, search_query)
         index_entries = index_entries.annotate(
-            rank=SearchRank(F('body_search'), search_query)
+            rank=SearchRank(
+                F('body_search'), search_query,
+                weights='{' + ','.join(map(str, WEIGHTS_VALUES)) + '}')
         ).order_by('-rank')
         pks = index_entries.pks()
         pks_sql, params = get_sql(pks)
@@ -239,7 +247,8 @@ class PostgresSearchQuery(BaseSearchQuery):
 
     def search_in_fields(self, queryset, search_query, start, stop):
         return (self.get_in_fields_queryset(queryset, search_query)
-                .annotate(_rank_=SearchRank(F('_search_'), search_query))
+                .annotate(_rank_=SearchRank(F('_search_'), search_query,
+                                            weights=WEIGHTS_VALUES))
                 .order_by('-_rank_'))[start:stop]
 
     def search(self, config, start, stop):
