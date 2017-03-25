@@ -8,7 +8,7 @@ from functools import partial, reduce
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.search import (
     SearchQuery, SearchRank, SearchVector)
-from django.db import DEFAULT_DB_ALIAS, connections
+from django.db import DEFAULT_DB_ALIAS, connections, transaction
 from django.db.models import F, Manager, Q, TextField, Value
 from django.db.models.functions import Cast
 from django.utils.encoding import force_text, python_2_unicode_compatible
@@ -275,7 +275,7 @@ class PostgresSearchResult(BaseSearchResults):
         return self.query.search_count(self.get_config())
 
 
-class PostgresSearchRebuilder(object):
+class PostgresSearchRebuilder:
     def __init__(self, index):
         self.index = index
 
@@ -287,6 +287,30 @@ class PostgresSearchRebuilder(object):
         pass
 
 
+class PostgresSearchAtomicRebuilder(PostgresSearchRebuilder):
+    def __init__(self, index):
+        super(PostgresSearchAtomicRebuilder, self).__init__(index)
+        # TODO: Get the DB alias another way.
+        db_alias = DEFAULT_DB_ALIAS
+        self.transaction = transaction.atomic(using=db_alias)
+        self.transaction_opened = False
+
+    def start(self):
+        self.transaction.__enter__()
+        self.transaction_opened = True
+        return super(PostgresSearchAtomicRebuilder, self).start()
+
+    def finish(self):
+        self.transaction.__exit__(None, None, None)
+        self.transaction_opened = False
+
+    def __del__(self):
+        # TODO: Implement a cleaner way to close the connection on failure.
+        if self.transaction_opened:
+            self.transaction.needs_rollback = True
+            self.finish()
+
+
 # FIXME: Take the database name into account.
 
 
@@ -294,10 +318,13 @@ class PostgresSearchBackend(BaseSearchBackend):
     query_class = PostgresSearchQuery
     results_class = PostgresSearchResult
     rebuilder_class = PostgresSearchRebuilder
+    atomic_rebuilder_class = PostgresSearchAtomicRebuilder
 
     def __init__(self, params):
         super(PostgresSearchBackend, self).__init__(params)
         self.params = params
+        if params.get('ATOMIC_REBUILD', False):
+            self.rebuilder_class = self.atomic_rebuilder_class
 
     def get_index_for_model(self, model):
         return Index(self, model)

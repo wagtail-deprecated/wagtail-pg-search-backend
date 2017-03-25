@@ -64,7 +64,7 @@ with most features mentioned in the the
 Known limitations
 ~~~~~~~~~~~~~~~~~
 
-* ```ATOMIC_REBUILD`_`` behaviour is not implemented.
+* Multiple databases are not handled properly.
 
 * ``SearchField.partial_match`` behaviour is not implemented.
 
@@ -80,8 +80,6 @@ Known limitations
 
 * Using ``SearchQuerySet.search`` while limiting to specific field(s) is only
   supported for database fields, not methods.
-
-.. _ATOMIC_REBUILD: http://docs.wagtail.io/en/v1.9/topics/search/backends.html#atomic-rebuild
 
 
 Performance
