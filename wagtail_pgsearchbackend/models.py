@@ -42,7 +42,7 @@ class IndexQuerySet(QuerySet):
                 weights='{' + ','.join(map(str, WEIGHTS_VALUES)) + '}'))
 
     def rank(self, search_query):
-        return self.add_rank(search_query).order_by('-rank')
+        return self.add_rank(search_query).order_by('rank')
 
     def pks(self):
         cast_field = self.model._meta.pk
