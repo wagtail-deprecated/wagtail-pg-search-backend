@@ -13,7 +13,6 @@ from django.db import DEFAULT_DB_ALIAS, connections
 from django.db.models import F, Manager, Q, TextField, Value
 from django.db.models.functions import Cast
 from django.utils.encoding import force_text, python_2_unicode_compatible
-from django.utils.html import strip_tags
 from wagtail.wagtailsearch.backends.base import (
     BaseSearchBackend, BaseSearchQuery, BaseSearchResults)
 from wagtail.wagtailsearch.index import RelatedFields, SearchField
@@ -78,8 +77,6 @@ class Index(object):
 
     def prepare_value(self, value):
         if isinstance(value, six.string_types):
-            if '</' in value:
-                return strip_tags(value)
             return value
         if isinstance(value, list):
             return ', '.join(self.prepare_value(item) for item in value)
