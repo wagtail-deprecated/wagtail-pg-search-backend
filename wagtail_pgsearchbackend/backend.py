@@ -231,7 +231,9 @@ class PostgresSearchQuery(BaseSearchQuery):
 
     def search_in_index(self, queryset, search_query, start, stop):
         index_entries = self.get_in_index_queryset(queryset, search_query)
-        pks = index_entries.rank(search_query).pks()
+        if self.order_by_relevance:
+            index_entries = index_entries.rank(search_query)
+        pks = index_entries.pks()
         pks_sql, params = get_sql(pks)
         meta = queryset.model._meta
         return queryset.model.objects.raw(
