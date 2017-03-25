@@ -61,7 +61,7 @@ class Index(object):
     def delete_stale_entries(self):
         qs1 = IndexEntry.objects.for_model(self.model).pks()
         # The empty `order_by` removes the order for performance’s sake.
-        qs2 = self.model.objects.order_by()
+        qs2 = self.model.objects.order_by().values('pk')
         sql1, params1 = get_sql(qs1)
         sql2, params2 = get_sql(qs2)
         pks_sql = '(%s) EXCEPT (%s)' % (sql1, sql2)
