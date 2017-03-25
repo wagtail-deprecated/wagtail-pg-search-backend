@@ -68,12 +68,17 @@ Known limitations
 
 * ``SearchField.partial_match`` behaviour is not implemented.
 
-* ``SearchField.boost`` does not handle floats. Boost values are rounded.
+* Due to a PostgreSQL limitation, ``SearchField.boost`` is only partially
+  respected. It is changed so that there can only be 4 different boosts.
+  If you define 4 or less different boosts,
+  everything will be perfectly accurate.
+  However, your search will be a little less accurate if you define more than
+  4 different boosts. That being said, it will work and be roughly the same.
 
 * ``SearchField.es_extra`` is not handled because it is specific
   to ElasticSearch.
 
-* ``SearchQuerySet.search`` limiting search to specific field(s) is only
+* Using ``SearchQuerySet.search`` while limiting to specific field(s) is only
   supported for database fields, not methods.
 
 .. _ATOMIC_REBUILD: http://docs.wagtail.io/en/v1.9/topics/search/backends.html#atomic-rebuild
@@ -138,3 +143,4 @@ the dotted path the the test module(s), class(es) or method(s) that you
 want to test e.g.::
 
     ./runtests.py tests.test_module.TestClass.test_method
+
