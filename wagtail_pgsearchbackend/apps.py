@@ -13,5 +13,5 @@ class PgSearchBackendConfig(AppConfig):
         max_weight = sorted_boosts_weights[-1][0]
         WEIGHTS_VALUES.extend([v / max_weight
                                for v, w in sorted_boosts_weights])
-        for i in range(WEIGHTS_COUNT - len(WEIGHTS_VALUES)):
+        for _ in range(WEIGHTS_COUNT - len(WEIGHTS_VALUES)):
             WEIGHTS_VALUES.insert(0, 0)
