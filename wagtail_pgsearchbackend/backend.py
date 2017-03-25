@@ -5,7 +5,6 @@ from __future__ import unicode_literals
 import operator
 from functools import partial, reduce
 
-import six
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.search import (
     SearchQuery, SearchRank, SearchVector)
@@ -13,6 +12,7 @@ from django.db import DEFAULT_DB_ALIAS, connections
 from django.db.models import F, Manager, Q, TextField, Value
 from django.db.models.functions import Cast
 from django.utils.encoding import force_text, python_2_unicode_compatible
+from django.utils.six import string_types
 from wagtail.wagtailsearch.backends.base import (
     BaseSearchBackend, BaseSearchQuery, BaseSearchResults)
 from wagtail.wagtailsearch.index import RelatedFields, SearchField
@@ -47,6 +47,7 @@ class Index(object):
         self.backend = backend
         self.model = model
         self.name = model._meta.label
+        self.search_fields = self.model.get_search_fields()
 
     def add_model(self, model):
         pass
@@ -76,7 +77,7 @@ class Index(object):
                                        DEFAULT_SEARCH_CONFIGURATION)
 
     def prepare_value(self, value):
-        if isinstance(value, six.string_types):
+        if isinstance(value, string_types):
             return value
         if isinstance(value, list):
             return ', '.join(self.prepare_value(item) for item in value)
@@ -105,7 +106,7 @@ class Index(object):
                         yield value
 
     def prepare_body(self, obj):
-        return [(value, boost) for field in obj.get_search_fields()
+        return [(value, boost) for field in self.search_fields
                 for value, boost in self.prepare_field(obj, field)]
 
     def add_item(self, obj):
@@ -176,6 +177,10 @@ class Index(object):
 
 
 class PostgresSearchQuery(BaseSearchQuery):
+    def __init__(self, *args, **kwargs):
+        super(PostgresSearchQuery, self).__init__(*args, **kwargs)
+        self.search_fields = self.queryset.model.get_search_fields()
+
     def _process_lookup(self, field, lookup, value):
         return Q(
             **{field.get_attname(self.queryset.model) + '__' + lookup: value})
@@ -203,7 +208,7 @@ class PostgresSearchQuery(BaseSearchQuery):
 
     def get_boost(self, field_name):
         # TODO: Handle related fields.
-        for field in self.queryset.model.get_search_fields():
+        for field in self.search_fields:
             if field.field_name == field_name:
                 return field.boost
 
