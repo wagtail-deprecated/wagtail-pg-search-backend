@@ -41,6 +41,19 @@ def get_sql(queryset):
     return queryset.query.get_compiler(get_db_alias(queryset)).as_sql()
 
 
+def get_pk_column(model):
+    return model._meta.pk.get_attname_column()[1]
+
+
+def get_pk_type(model, connection):
+    type = model._meta.pk.db_type(connection)
+    if type == 'serial':
+        return 'int'
+    if type == 'bigserial':
+        return 'bigint'
+    return type
+
+
 @python_2_unicode_compatible
 class Index(object):
     def __init__(self, backend, model):
@@ -203,8 +216,25 @@ class PostgresSearchQuery(BaseSearchQuery):
         return queryset.order_by()
 
     def get_in_index_queryset(self, queryset, search_query):
-        return (IndexEntry.objects.for_queryset(queryset)
+        return (IndexEntry.objects.using(get_db_alias(queryset))
+                .for_models(*get_ancestor_models(queryset.model))
                 .filter(body_search=search_query))
+
+    def get_in_index_count(self, queryset, search_query):
+        index_sql, index_params = get_sql(
+            self.get_in_index_queryset(queryset, search_query)
+            .values('object_id'))
+        model_sql, model_params = get_sql(queryset)
+        connection = connections[get_db_alias(queryset)]
+        sql = """
+            SELECT COUNT(*)
+            FROM (%s) AS index_entry
+            INNER JOIN (%s) AS obj ON obj."%s" = index_entry.object_id::%s;
+            """ % (index_sql, model_sql, get_pk_column(queryset.model),
+                   get_pk_type(queryset.model, connection))
+        with connection.cursor() as cursor:
+            cursor.execute(sql, index_params + model_params)
+            return cursor.fetchone()[0]
 
     def get_boost(self, field_name):
         # TODO: Handle related fields.
@@ -224,24 +254,28 @@ class PostgresSearchQuery(BaseSearchQuery):
     def search_count(self, config):
         queryset = self.get_base_queryset()
         search_query = self.get_search_query(config=config)
-        queryset = (self.get_in_index_queryset(queryset, search_query)
-                    if self.fields is None
-                    else self.get_in_fields_queryset(queryset, search_query))
-        return queryset.count()
+        if self.fields is None:
+            return self.get_in_index_count(queryset, search_query)
+        return self.get_in_fields_queryset(queryset, search_query).count()
 
     def search_in_index(self, queryset, search_query, start, stop):
         index_entries = self.get_in_index_queryset(queryset, search_query)
         if self.order_by_relevance:
             index_entries = index_entries.rank(search_query)
-        pks = index_entries.pks()
-        pks_sql, params = get_sql(pks)
-        meta = queryset.model._meta
-        return queryset.model.objects.raw(
-            'SELECT * FROM (%s) AS pks(pk) '
-            'INNER JOIN %s ON %s = pks.pk '
-            'OFFSET %%s LIMIT %%s'
-            % (pks_sql, meta.db_table, meta.pk.get_attname_column()[1]),
-            params + (start, None if stop is None else stop - start))
+        index_sql, index_params = get_sql(index_entries.values('object_id'))
+        model_sql, model_params = get_sql(queryset)
+        model = queryset.model
+        db_alias = get_db_alias(queryset)
+        sql = """
+            SELECT obj.*
+            FROM (%s) AS index_entry
+            INNER JOIN (%s) AS obj ON obj."%s" = index_entry.object_id::%s
+            OFFSET %%s LIMIT %%s;
+            """ % (index_sql, model_sql, get_pk_column(model),
+                   get_pk_type(model, connections[db_alias]))
+        limits = (start, None if stop is None else stop - start)
+        return model.objects.using(db_alias).raw(
+            sql, index_params + model_params + limits)
 
     def search_in_fields(self, queryset, search_query, start, stop):
         return (self.get_in_fields_queryset(queryset, search_query)
