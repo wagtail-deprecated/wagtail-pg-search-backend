@@ -9,8 +9,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.search import (
     SearchQuery, SearchRank, SearchVector)
 from django.db import DEFAULT_DB_ALIAS, connections, transaction
-from django.db.models import F, Manager, Q, TextField, Value
-from django.db.models.functions import Cast
+from django.db.models import F, Manager, Q, Value
 from django.utils.encoding import force_text, python_2_unicode_compatible
 from django.utils.six import string_types
 from wagtail.wagtailsearch.backends.base import (
@@ -45,15 +44,6 @@ def get_pk_column(model):
     return model._meta.pk.get_attname_column()[1]
 
 
-def get_pk_type(model, connection):
-    type = model._meta.pk.db_type(connection)
-    if type == 'serial':
-        return 'int'
-    if type == 'bigserial':
-        return 'bigint'
-    return type
-
-
 @python_2_unicode_compatible
 class Index(object):
     def __init__(self, backend, model):
@@ -69,10 +59,9 @@ class Index(object):
         pass
 
     def delete_stale_entries(self):
-        qs1 = IndexEntry.objects.for_model(self.model).values('object_id')
+        qs1 = IndexEntry.objects.for_model(self.model).pks()
         # The empty `order_by` removes the order for performance’s sake.
-        qs2 = self.model.objects.order_by().annotate(
-            pk_text=Cast('pk', TextField())).values('pk_text')
+        qs2 = self.model.objects.order_by()
         sql1, params1 = get_sql(qs1)
         sql2, params2 = get_sql(qs2)
         pks_sql = '(%s) EXCEPT (%s)' % (sql1, sql2)
@@ -222,17 +211,14 @@ class PostgresSearchQuery(BaseSearchQuery):
 
     def get_in_index_count(self, queryset, search_query):
         index_sql, index_params = get_sql(
-            self.get_in_index_queryset(queryset, search_query)
-            .values('object_id'))
+            self.get_in_index_queryset(queryset, search_query).pks())
         model_sql, model_params = get_sql(queryset)
-        connection = connections[get_db_alias(queryset)]
         sql = """
             SELECT COUNT(*)
             FROM (%s) AS index_entry
-            INNER JOIN (%s) AS obj ON obj."%s" = index_entry.object_id::%s;
-            """ % (index_sql, model_sql, get_pk_column(queryset.model),
-                   get_pk_type(queryset.model, connection))
-        with connection.cursor() as cursor:
+            INNER JOIN (%s) AS obj ON obj."%s" = index_entry.typed_pk;
+            """ % (index_sql, model_sql, get_pk_column(queryset.model))
+        with connections[get_db_alias(queryset)].cursor() as cursor:
             cursor.execute(sql, index_params + model_params)
             return cursor.fetchone()[0]
 
@@ -262,17 +248,16 @@ class PostgresSearchQuery(BaseSearchQuery):
         index_entries = self.get_in_index_queryset(queryset, search_query)
         if self.order_by_relevance:
             index_entries = index_entries.rank(search_query)
-        index_sql, index_params = get_sql(index_entries.values('object_id'))
+        index_sql, index_params = get_sql(index_entries.pks())
         model_sql, model_params = get_sql(queryset)
         model = queryset.model
         db_alias = get_db_alias(queryset)
         sql = """
             SELECT obj.*
             FROM (%s) AS index_entry
-            INNER JOIN (%s) AS obj ON obj."%s" = index_entry.object_id::%s
+            INNER JOIN (%s) AS obj ON obj."%s" = index_entry.typed_pk
             OFFSET %%s LIMIT %%s;
-            """ % (index_sql, model_sql, get_pk_column(model),
-                   get_pk_type(model, connections[db_alias]))
+            """ % (index_sql, model_sql, get_pk_column(model))
         limits = (start, None if stop is None else stop - start)
         return model.objects.using(db_alias).raw(
             sql, index_params + model_params + limits)
