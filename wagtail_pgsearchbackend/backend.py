@@ -231,12 +231,7 @@ class PostgresSearchQuery(BaseSearchQuery):
 
     def search_in_index(self, queryset, search_query, start, stop):
         index_entries = self.get_in_index_queryset(queryset, search_query)
-        index_entries = index_entries.annotate(
-            rank=SearchRank(
-                F('body_search'), search_query,
-                weights='{' + ','.join(map(str, WEIGHTS_VALUES)) + '}')
-        ).order_by('-rank')
-        pks = index_entries.pks()
+        pks = index_entries.rank(search_query).pks()
         pks_sql, params = get_sql(pks)
         meta = queryset.model._meta
         return queryset.model.objects.raw(

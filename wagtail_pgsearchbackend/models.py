@@ -1,14 +1,14 @@
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from django.contrib.postgres.search import SearchVectorField
+from django.contrib.postgres.search import SearchRank, SearchVectorField
 from django.db.models import (
-    CASCADE, AutoField, BigAutoField, BigIntegerField, ForeignKey,
+    CASCADE, AutoField, BigAutoField, BigIntegerField, F, ForeignKey,
     IntegerField, Model, QuerySet, TextField)
 from django.db.models.functions import Cast
 from django.utils.encoding import force_text, python_2_unicode_compatible
 from django.utils.translation import ugettext_lazy as _
 
-from .utils import get_ancestor_models
+from .utils import WEIGHTS_VALUES, get_ancestor_models
 
 
 class IndexQuerySet(QuerySet):
@@ -34,6 +34,15 @@ class IndexQuerySet(QuerySet):
                 object_id__in=(queryset.annotate(text_pk=Cast('pk',
                                                               TextField()))
                                .values('text_pk'))))
+
+    def add_rank(self, search_query):
+        return self.annotate(
+            rank=SearchRank(
+                F('body_search'), search_query,
+                weights='{' + ','.join(map(str, WEIGHTS_VALUES)) + '}'))
+
+    def rank(self, search_query):
+        return self.add_rank(search_query).order_by('-rank')
 
     def pks(self):
         cast_field = self.model._meta.pk
