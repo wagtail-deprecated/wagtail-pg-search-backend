@@ -1,7 +1,7 @@
 from django.apps import AppConfig
 
 from wagtail_pgsearchbackend.utils import (
-    BOOSTS_WEIGHTS, WEIGHTS_VALUES, determine_boosts_weights)
+    BOOSTS_WEIGHTS, WEIGHTS_COUNT, WEIGHTS_VALUES, determine_boosts_weights)
 
 
 class PgSearchBackendConfig(AppConfig):
@@ -13,3 +13,5 @@ class PgSearchBackendConfig(AppConfig):
         max_weight = sorted_boosts_weights[-1][0]
         WEIGHTS_VALUES.extend([v / max_weight
                                for v, w in sorted_boosts_weights])
+        for i in range(WEIGHTS_COUNT - len(WEIGHTS_VALUES)):
+            WEIGHTS_VALUES.insert(0, 0)

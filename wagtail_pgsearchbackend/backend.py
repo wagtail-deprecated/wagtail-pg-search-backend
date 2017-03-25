@@ -85,11 +85,10 @@ class Index(object):
                              for item in value.values())
         return force_text(value)
 
-    def prepare_field(self, obj, field, config):
+    def prepare_field(self, obj, field):
         if isinstance(field, SearchField):
-            yield SearchVector(
-                Value(unidecode(self.prepare_value(field.get_value(obj)))),
-                weight=get_weight(field.boost), config=config)
+            yield (unidecode(self.prepare_value(field.get_value(obj))),
+                   get_weight(field.boost))
         elif isinstance(field, RelatedFields):
             sub_obj = getattr(obj, field.field_name)
             if sub_obj is None:
@@ -102,30 +101,25 @@ class Index(object):
                 sub_objs = [sub_obj]
             for sub_obj in sub_objs:
                 for sub_field in field.fields:
-                    for value in self.prepare_field(sub_obj, sub_field,
-                                                    config):
+                    for value in self.prepare_field(sub_obj, sub_field):
                         yield value
 
-    def prepare_body(self, obj, config):
-        config = Value(config)
-        return ADD([value for field in obj.get_search_fields()
-                    for value in self.prepare_field(obj, field, config)])
+    def prepare_body(self, obj):
+        return [(value, boost) for field in obj.get_search_fields()
+                for value, boost in self.prepare_field(obj, field)]
 
     def add_item(self, obj):
         self.add_items(self.model, [obj])
 
-    def add_items_upsert(self, connection, content_types, objs):
+    def add_items_upsert(self, connection, content_types, objs, config):
         vectors_sql = []
         data_params = []
-        whatever_compiler = (self.model.objects.all().query
-                             .get_compiler(connection=connection))
+        sql_template = "setweight(to_tsvector('%s', %%s), %%s)" % config
         for content_type in content_types:
             for obj in objs:
-                sql, params = obj._search_vector.as_sql(whatever_compiler,
-                                                        connection)
-                vectors_sql.append(sql)
+                vectors_sql.append('||'.join(sql_template for _ in obj._body_))
                 data_params.extend((content_type.pk, obj._object_id))
-                data_params.extend(params)
+                data_params.extend([v for t in obj._body_ for v in t])
         data_sql = ', '.join(['(%%s, %%s, %s)' % s for s in vectors_sql])
         with connection.cursor() as cursor:
             cursor.execute("""
@@ -135,8 +129,13 @@ class Index(object):
                 DO UPDATE SET body_search = EXCLUDED.body_search
                 """ % (IndexEntry._meta.db_table, data_sql), data_params)
 
-    def add_items_update_then_create(self, content_types, objs):
-        ids_and_objs = {obj._object_id: obj for obj in objs}
+    def add_items_update_then_create(self, content_types, objs, config):
+        ids_and_objs = {}
+        for obj in objs:
+            obj._search_vector = ADD([
+                SearchVector(Value(text), weight=weight, config=config)
+                for text, weight in obj._body_])
+            ids_and_objs[obj._object_id] = obj
         indexed_ids = frozenset(
             IndexEntry.objects.filter(content_type__in=content_types,
                                       object_id__in=ids_and_objs)
@@ -163,14 +162,14 @@ class Index(object):
         config = self.get_config()
         for obj in objs:
             obj._object_id = force_text(obj.pk)
-            obj._search_vector = self.prepare_body(obj, config)
+            obj._body_ = self.prepare_body(obj)
         # TODO: Get the DB alias another way.
         db_alias = DEFAULT_DB_ALIAS
         connection = connections[db_alias]
         if connection.pg_version >= 90500:  # PostgreSQL >= 9.5
-            self.add_items_upsert(connection, content_types, objs)
+            self.add_items_upsert(connection, content_types, objs, config)
         else:
-            self.add_items_update_then_create(content_types, objs)
+            self.add_items_update_then_create(content_types, objs, config)
 
     def __str__(self):
         return self.name
