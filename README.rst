@@ -92,6 +92,17 @@ of ElasticSearch.
 Some noticeable speed improvements are in place when using PostgreSQL >= 9.5.
 
 
+Features to add
+---------------
+
+These features would awesome to have once this project is merged with Wagtail:
+
+- Per-object boosting
+- Faceting
+- Autocomplete (maybe it should replace partial search?)
+- Spelling suggestions
+
+
 Development
 -----------
 
