@@ -7,6 +7,7 @@ from django.contrib.postgres.search import (
 from django.db import (
     DEFAULT_DB_ALIAS, NotSupportedError, connections, transaction)
 from django.db.models import F, Manager, Q, Value
+from django.db.models.constants import LOOKUP_SEP
 from django.utils.encoding import force_text, python_2_unicode_compatible
 from django.utils.six import string_types
 from wagtail.wagtailsearch.backends.base import (
@@ -218,10 +219,20 @@ class PostgresSearchQuery(BaseSearchQuery):
             cursor.execute(sql, index_params + model_params)
             return cursor.fetchone()[0]
 
-    def get_boost(self, field_name):
-        # TODO: Handle related fields.
-        for field in self.search_fields:
+    def get_boost(self, field_name, fields=None):
+        if fields is None:
+            fields = self.search_fields
+        if LOOKUP_SEP in field_name:
+            field_name, sub_field_name = field_name.split(LOOKUP_SEP, 1)
+        else:
+            sub_field_name = None
+        for field in fields:
             if field.field_name == field_name:
+                # Note: Searching on a specific related field using
+                # `.search(fields=…)` is not yet supported by Wagtail.
+                # This method anticipates by already implementing it.
+                if isinstance(field, RelatedFields):
+                    return self.get_boost(sub_field_name, field.fields)
                 return field.boost
 
     def get_in_fields_queryset(self, queryset, search_query):
