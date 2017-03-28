@@ -1,4 +1,4 @@
-PHONY: test unittests flaketest
+PHONY: test unittests flaketest checkmanifest checksetup clean build release
 
 test: unittests flaketest checkmanifest checksetup
 
@@ -17,3 +17,15 @@ checkmanifest:
 checksetup:
 	# Check longdescription and metadata
 	python setup.py check -msr
+
+clean:
+	# Remove build and dist dirs
+	rm -rf build dist
+
+build: test clean
+	# Test, clean and build dist
+	python setup.py build sdist bdist_wheel
+
+release: build
+	# Build and upload to PyPI
+	twine upload dist/*
