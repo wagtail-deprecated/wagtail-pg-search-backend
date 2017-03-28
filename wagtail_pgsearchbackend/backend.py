@@ -120,9 +120,12 @@ class Index(object):
                         else "to_tsvector('%s', %%s)" % config)
         sql_template = 'setweight(%s, %%s)' % sql_template
         for obj in objs:
-            vectors_sql.append('||'.join(sql_template for _ in obj._body_))
             data_params.extend((content_type_pk, obj._object_id))
-            data_params.extend([v for t in obj._body_ for v in t])
+            if obj._body_:
+                vectors_sql.append('||'.join(sql_template for _ in obj._body_))
+                data_params.extend([v for t in obj._body_ for v in t])
+            else:
+                vectors_sql.append("''::tsvector")
         data_sql = ', '.join(['(%%s, %%s, %s)' % s for s in vectors_sql])
         with connection.cursor() as cursor:
             cursor.execute("""
@@ -135,7 +138,7 @@ class Index(object):
     def add_items_update_then_create(self, content_type_pk, objs, config):
         ids_and_objs = {}
         for obj in objs:
-            obj._search_vector = ADD([
+            obj._search_vector_ = ADD([
                 SearchVector(Value(text), weight=weight, config=config)
                 for text, weight in obj._body_])
             ids_and_objs[obj._object_id] = obj
@@ -148,14 +151,14 @@ class Index(object):
         for indexed_id in indexed_ids:
             obj = ids_and_objs[indexed_id]
             index_entries_for_ct.filter(object_id=obj._object_id) \
-                .update(body_search=obj._search_vector)
+                .update(body_search=obj._search_vector_)
         to_be_created = []
         for object_id in ids_and_objs:
             if object_id not in indexed_ids:
                 to_be_created.append(IndexEntry(
                     content_type_id=content_type_pk,
                     object_id=object_id,
-                    body_search=ids_and_objs[object_id]._search_vector,
+                    body_search=ids_and_objs[object_id]._search_vector_,
                 ))
         index_entries.bulk_create(to_be_created)
 
