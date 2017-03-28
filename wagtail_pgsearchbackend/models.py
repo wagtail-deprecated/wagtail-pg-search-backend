@@ -13,7 +13,8 @@ from .utils import WEIGHTS_VALUES, get_ancestor_models
 
 class IndexQuerySet(QuerySet):
     def for_models(self, *models):
-        content_types = ContentType.objects.get_for_models(*models).values()
+        content_types = (ContentType.objects.using(self._db)
+                         .get_for_models(*models).values())
         return self.filter(content_type__in=content_types)
 
     def for_objects(self, *objs):
@@ -22,7 +23,7 @@ class IndexQuerySet(QuerySet):
 
     def for_model(self, model):
         return self.filter(
-            content_type=ContentType.objects.get_for_model(model))
+            content_type=ContentType.objects.using(self._db).get_for_model(model))
 
     def for_object(self, obj):
         db_alias = obj._state.db
