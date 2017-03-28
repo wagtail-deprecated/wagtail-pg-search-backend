@@ -13,7 +13,7 @@ from .utils import WEIGHTS_VALUES, get_ancestor_models
 
 class IndexQuerySet(QuerySet):
     def for_models(self, *models):
-        content_types = (ContentType.objects.using(self._db)
+        content_types = (ContentType.default_manager.using(self._db)
                          .get_for_models(*models).values())
         return self.filter(content_type__in=content_types)
 
@@ -22,8 +22,8 @@ class IndexQuerySet(QuerySet):
                 .filter(object_id__in=[force_text(obj.pk) for obj in objs]))
 
     def for_model(self, model):
-        return self.filter(
-            content_type=ContentType.objects.using(self._db).get_for_model(model))
+        return self.filter(content_type=ContentType.default_manager
+                           .using(self._db).get_for_model(model))
 
     def for_object(self, obj):
         db_alias = obj._state.db

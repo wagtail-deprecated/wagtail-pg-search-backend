@@ -68,10 +68,11 @@ class Index(object):
         pass
 
     def delete_stale_entries(self):
-        qs1 = (IndexEntry.objects.using(self.db_alias)
+        qs1 = (IndexEntry.default_manager.using(self.db_alias)
                .for_model(self.model).pks())
         # The empty `order_by` removes the order for performance’s sake.
-        qs2 = self.model.objects.using(self.db_alias).order_by().values('pk')
+        qs2 = (self.model.default_manager.using(self.db_alias)
+               .order_by().values('pk'))
         sql1, params1 = get_sql(qs1)
         sql2, params2 = get_sql(qs2)
         pks_sql = '(%s) EXCEPT (%s)' % (sql1, sql2)
@@ -149,7 +150,7 @@ class Index(object):
                 SearchVector(Value(text), weight=weight, config=config)
                 for text, weight in obj._body_])
             ids_and_objs[obj._object_id] = obj
-        index_entries = IndexEntry.objects.using(self.db_alias)
+        index_entries = IndexEntry.default_manager.using(self.db_alias)
         index_entries_for_cts = index_entries.filter(
             content_type_id__in=content_types_pks)
         indexed_ids = frozenset(
@@ -172,7 +173,7 @@ class Index(object):
 
     def add_items(self, model, objs):
         content_types_pks = (
-            ContentType.objects.using(self.db_alias)
+            ContentType.default_manager.using(self.db_alias)
             .filter(OR([Q(app_label=model._meta.app_label,
                           model=model._meta.model_name)
                         for model in get_ancestor_models(model)]))
@@ -218,7 +219,7 @@ class PostgresSearchQuery(BaseSearchQuery):
         return queryset.order_by()
 
     def get_in_index_queryset(self, queryset, search_query):
-        return (IndexEntry.objects.using(get_db_alias(queryset))
+        return (IndexEntry.default_manager.using(get_db_alias(queryset))
                 .for_models(*get_ancestor_models(queryset.model))
                 .filter(body_search=search_query))
 
@@ -271,7 +272,7 @@ class PostgresSearchQuery(BaseSearchQuery):
             OFFSET %%s LIMIT %%s;
             """ % (index_sql, model_sql, get_pk_column(model))
         limits = (start, None if stop is None else stop - start)
-        return model.objects.using(get_db_alias(queryset)).raw(
+        return model.default_manager.using(get_db_alias(queryset)).raw(
             sql, index_params + model_params + limits)
 
     def search_in_fields(self, queryset, search_query, start, stop):
@@ -358,7 +359,7 @@ class PostgresSearchBackend(BaseSearchBackend):
 
     def reset_index(self):
         for connection in get_postgresql_connections():
-            IndexEntry.objects.using(connection.alias).delete()
+            IndexEntry.default_manager.using(connection.alias).delete()
 
     def add_type(self, model):
         pass  # Not needed.
@@ -374,7 +375,7 @@ class PostgresSearchBackend(BaseSearchBackend):
             self.get_index_for_object(obj_list[0]).add_items(model, obj_list)
 
     def delete(self, obj):
-        IndexEntry.objects.for_object(obj).delete()
+        IndexEntry.default_manager.for_object(obj).delete()
 
 
 SearchBackend = PostgresSearchBackend
