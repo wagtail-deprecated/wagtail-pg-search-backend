@@ -1,6 +1,7 @@
 import re
 
 from django.apps import apps
+from django.db import connections
 from wagtail.wagtailsearch.index import Indexed, RelatedFields, SearchField
 
 try:
@@ -9,6 +10,11 @@ try:
 except ImportError:
     def unidecode(value):
         return value
+
+
+def get_postgresql_connections():
+    return [connection for connection in connections.all()
+            if connection.vendor == 'postgresql']
 
 
 def keyword_split(keywords):

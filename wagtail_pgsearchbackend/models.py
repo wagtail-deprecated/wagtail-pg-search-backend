@@ -25,15 +25,10 @@ class IndexQuerySet(QuerySet):
             content_type=ContentType.objects.get_for_model(model))
 
     def for_object(self, obj):
-        return (self.for_models(*get_ancestor_models(obj._meta.model))
+        db_alias = obj._state.db
+        return (self.using(db_alias)
+                .for_models(*get_ancestor_models(obj._meta.model))
                 .filter(object_id=force_text(obj.pk)))
-
-    def for_queryset(self, queryset):
-        return (
-            self.for_models(*get_ancestor_models(queryset.model)).filter(
-                object_id__in=(queryset.annotate(text_pk=Cast('pk',
-                                                              TextField()))
-                               .values('text_pk'))))
 
     def add_rank(self, search_query):
         return self.annotate(

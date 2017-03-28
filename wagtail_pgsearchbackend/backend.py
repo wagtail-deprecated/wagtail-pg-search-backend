@@ -8,7 +8,8 @@ from functools import partial, reduce
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.search import (
     SearchQuery, SearchRank, SearchVector)
-from django.db import DEFAULT_DB_ALIAS, connections, transaction
+from django.db import (
+    DEFAULT_DB_ALIAS, NotSupportedError, connections, transaction)
 from django.db.models import F, Manager, Q, Value
 from django.utils.encoding import force_text, python_2_unicode_compatible
 from django.utils.six import string_types
@@ -18,7 +19,8 @@ from wagtail.wagtailsearch.index import RelatedFields, SearchField
 
 from .models import IndexEntry
 from .utils import (
-    WEIGHTS_VALUES, get_ancestor_models, get_weight, keyword_split, unidecode)
+    WEIGHTS_VALUES, get_ancestor_models, get_postgresql_connections,
+    get_weight, keyword_split, unidecode)
 
 # TODO: Add autocomplete.
 
@@ -46,9 +48,16 @@ def get_pk_column(model):
 
 @python_2_unicode_compatible
 class Index(object):
-    def __init__(self, backend, model):
+    def __init__(self, backend, model, db_alias=None):
         self.backend = backend
         self.model = model
+        if db_alias is None:
+            db_alias = DEFAULT_DB_ALIAS
+        if connections[db_alias].vendor != 'postgresql':
+            raise NotSupportedError(
+                'You must select a PostgreSQL database '
+                'to use PostgreSQL search.')
+        self.db_alias = db_alias
         self.name = model._meta.label
         self.search_fields = self.model.get_search_fields()
 
@@ -59,9 +68,10 @@ class Index(object):
         pass
 
     def delete_stale_entries(self):
-        qs1 = IndexEntry.objects.for_model(self.model).pks()
+        qs1 = (IndexEntry.objects.using(self.db_alias)
+               .for_model(self.model).pks())
         # The empty `order_by` removes the order for performance’s sake.
-        qs2 = self.model.objects.order_by().values('pk')
+        qs2 = self.model.objects.using(self.db_alias).order_by().values('pk')
         sql1, params1 = get_sql(qs1)
         sql2, params2 = get_sql(qs2)
         pks_sql = '(%s) EXCEPT (%s)' % (sql1, sql2)
@@ -114,14 +124,14 @@ class Index(object):
     def add_item(self, obj):
         self.add_items(self.model, [obj])
 
-    def add_items_upsert(self, connection, content_types, objs, config):
+    def add_items_upsert(self, connection, content_types_pks, objs, config):
         vectors_sql = []
         data_params = []
         sql_template = "setweight(to_tsvector('%s', %%s), %%s)" % config
-        for content_type in content_types:
+        for content_type_pk in content_types_pks:
             for obj in objs:
                 vectors_sql.append('||'.join(sql_template for _ in obj._body_))
-                data_params.extend((content_type.pk, obj._object_id))
+                data_params.extend((content_type_pk, obj._object_id))
                 data_params.extend([v for t in obj._body_ for v in t])
         data_sql = ', '.join(['(%%s, %%s, %s)' % s for s in vectors_sql])
         with connection.cursor() as cursor:
@@ -132,47 +142,50 @@ class Index(object):
                 DO UPDATE SET body_search = EXCLUDED.body_search
                 """ % (IndexEntry._meta.db_table, data_sql), data_params)
 
-    def add_items_update_then_create(self, content_types, objs, config):
+    def add_items_update_then_create(self, content_types_pks, objs, config):
         ids_and_objs = {}
         for obj in objs:
             obj._search_vector = ADD([
                 SearchVector(Value(text), weight=weight, config=config)
                 for text, weight in obj._body_])
             ids_and_objs[obj._object_id] = obj
+        index_entries = IndexEntry.objects.using(self.db_alias)
+        index_entries_for_cts = index_entries.filter(
+            content_type_id__in=content_types_pks)
         indexed_ids = frozenset(
-            IndexEntry.objects.filter(content_type__in=content_types,
-                                      object_id__in=ids_and_objs)
+            index_entries_for_cts.filter(object_id__in=ids_and_objs)
             .values_list('object_id', flat=True))
         for indexed_id in indexed_ids:
             obj = ids_and_objs[indexed_id]
-            IndexEntry.objects.filter(content_type__in=content_types,
-                                      object_id=obj._object_id) \
+            index_entries_for_cts.filter(object_id=obj._object_id) \
                 .update(body_search=obj._search_vector)
         to_be_created = []
         for object_id in ids_and_objs:
             if object_id not in indexed_ids:
-                for content_type in content_types:
+                for content_type_pk in content_types_pks:
                     to_be_created.append(IndexEntry(
-                        content_type=content_type,
+                        content_type_id=content_type_pk,
                         object_id=object_id,
                         body_search=ids_and_objs[object_id]._search_vector,
                     ))
-        IndexEntry.objects.bulk_create(to_be_created)
+        index_entries.bulk_create(to_be_created)
 
     def add_items(self, model, objs):
-        content_types = (ContentType.objects
-                         .get_for_models(*get_ancestor_models(model)).values())
+        content_types_pks = (
+            ContentType.objects.using(self.db_alias)
+            .filter(OR([Q(app_label=model._meta.app_label,
+                          model=model._meta.model_name)
+                        for model in get_ancestor_models(model)]))
+            .values_list('pk', flat=True))
         config = self.get_config()
         for obj in objs:
             obj._object_id = force_text(obj.pk)
             obj._body_ = self.prepare_body(obj)
-        # TODO: Get the DB alias another way.
-        db_alias = DEFAULT_DB_ALIAS
-        connection = connections[db_alias]
+        connection = connections[self.db_alias]
         if connection.pg_version >= 90500:  # PostgreSQL >= 9.5
-            self.add_items_upsert(connection, content_types, objs, config)
+            self.add_items_upsert(connection, content_types_pks, objs, config)
         else:
-            self.add_items_update_then_create(content_types, objs, config)
+            self.add_items_update_then_create(content_types_pks, objs, config)
 
     def __str__(self):
         return self.name
@@ -251,7 +264,6 @@ class PostgresSearchQuery(BaseSearchQuery):
         index_sql, index_params = get_sql(index_entries.pks())
         model_sql, model_params = get_sql(queryset)
         model = queryset.model
-        db_alias = get_db_alias(queryset)
         sql = """
             SELECT obj.*
             FROM (%s) AS index_entry
@@ -259,7 +271,7 @@ class PostgresSearchQuery(BaseSearchQuery):
             OFFSET %%s LIMIT %%s;
             """ % (index_sql, model_sql, get_pk_column(model))
         limits = (start, None if stop is None else stop - start)
-        return model.objects.using(db_alias).raw(
+        return model.objects.using(get_db_alias(queryset)).raw(
             sql, index_params + model_params + limits)
 
     def search_in_fields(self, queryset, search_query, start, stop):
@@ -280,8 +292,9 @@ class PostgresSearchQuery(BaseSearchQuery):
 
 class PostgresSearchResult(BaseSearchResults):
     def get_config(self):
+        queryset = self.query.queryset
         return self.backend.get_index_for_model(
-            self.query.queryset.model).get_config()
+            queryset.model, queryset._db).get_config()
 
     def _do_search(self):
         return list(self.query.search(self.get_config(),
@@ -306,9 +319,7 @@ class PostgresSearchRebuilder:
 class PostgresSearchAtomicRebuilder(PostgresSearchRebuilder):
     def __init__(self, index):
         super(PostgresSearchAtomicRebuilder, self).__init__(index)
-        # TODO: Get the DB alias another way.
-        db_alias = DEFAULT_DB_ALIAS
-        self.transaction = transaction.atomic(using=db_alias)
+        self.transaction = transaction.atomic(using=index.db_alias)
         self.transaction_opened = False
 
     def start(self):
@@ -327,9 +338,6 @@ class PostgresSearchAtomicRebuilder(PostgresSearchRebuilder):
             self.finish()
 
 
-# FIXME: Take the database name into account.
-
-
 class PostgresSearchBackend(BaseSearchBackend):
     query_class = PostgresSearchQuery
     results_class = PostgresSearchResult
@@ -342,11 +350,15 @@ class PostgresSearchBackend(BaseSearchBackend):
         if params.get('ATOMIC_REBUILD', False):
             self.rebuilder_class = self.atomic_rebuilder_class
 
-    def get_index_for_model(self, model):
-        return Index(self, model)
+    def get_index_for_model(self, model, db_alias=None):
+        return Index(self, model, db_alias)
+
+    def get_index_for_object(self, obj):
+        return self.get_index_for_model(obj._meta.model, obj._state.db)
 
     def reset_index(self):
-        IndexEntry.objects.all().delete()
+        for connection in get_postgresql_connections():
+            IndexEntry.objects.using(connection.alias).delete()
 
     def add_type(self, model):
         pass  # Not needed.
@@ -355,10 +367,11 @@ class PostgresSearchBackend(BaseSearchBackend):
         pass  # Not needed.
 
     def add(self, obj):
-        self.get_index_for_model(obj._meta.model).add_item(obj)
+        self.get_index_for_object(obj).add_item(obj)
 
     def add_bulk(self, model, obj_list):
-        self.get_index_for_model(model).add_items(model, obj_list)
+        if obj_list:
+            self.get_index_for_object(obj_list[0]).add_items(model, obj_list)
 
     def delete(self, obj):
         IndexEntry.objects.for_object(obj).delete()

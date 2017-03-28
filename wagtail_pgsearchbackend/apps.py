@@ -1,13 +1,23 @@
 from django.apps import AppConfig
+from django.core.checks import Error, Tags, register
 
-from wagtail_pgsearchbackend.utils import (
-    BOOSTS_WEIGHTS, WEIGHTS_COUNT, WEIGHTS_VALUES, determine_boosts_weights)
+from .utils import (
+    BOOSTS_WEIGHTS, WEIGHTS_COUNT, WEIGHTS_VALUES, determine_boosts_weights,
+    get_postgresql_connections)
 
 
 class PgSearchBackendConfig(AppConfig):
     name = 'wagtail_pgsearchbackend'
 
     def ready(self):
+        @register(Tags.compatibility, Tags.database)
+        def check_if_postgresql(app_configs, **kwargs):
+            if get_postgresql_connections():
+                return []
+            return [Error('You must use a PostgreSQL database '
+                          'to use PostgreSQL search.',
+                          id='wagtail_pgsearchbackend.E001')]
+
         BOOSTS_WEIGHTS.extend(determine_boosts_weights())
         sorted_boosts_weights = sorted(BOOSTS_WEIGHTS, key=lambda t: t[0])
         max_weight = sorted_boosts_weights[-1][0]
