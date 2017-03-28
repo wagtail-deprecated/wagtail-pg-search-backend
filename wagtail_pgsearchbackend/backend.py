@@ -15,8 +15,8 @@ from wagtail.wagtailsearch.index import RelatedFields, SearchField
 
 from .models import IndexEntry
 from .utils import (
-    WEIGHTS_VALUES, get_descendant_models, get_postgresql_connections,
-    get_weight, keyword_split, unidecode, ADD, AND, OR, get_content_types_pks)
+    ADD, AND, OR, WEIGHTS_VALUES, get_content_types_pks, get_descendant_models,
+    get_postgresql_connections, get_weight, keyword_split, unidecode)
 
 # TODO: Add autocomplete.
 

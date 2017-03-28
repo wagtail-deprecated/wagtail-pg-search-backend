@@ -1,6 +1,6 @@
-from functools import partial, reduce
 import operator
 import re
+from functools import partial, reduce
 
 from django.apps import apps
 from django.db import connections
