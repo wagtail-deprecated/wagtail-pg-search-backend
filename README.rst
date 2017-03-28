@@ -1,8 +1,8 @@
 Wagtail PostgreSQL full text search backend
 ===========================================
 
-.. image:: http://img.shields.io/travis/leukeleu/wagtail-pg-search-backend/master.svg
-   :target: https://travis-ci.org/leukeleu/wagtail-pg-search-backend
+.. image:: http://img.shields.io/travis/wagtail/wagtail-pg-search-backend/master.svg
+   :target: https://travis-ci.org/wagtail/wagtail-pg-search-backend
 
 A PostgreSQL full text search backend for Wagtail CMS.
 
