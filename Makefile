@@ -1,4 +1,4 @@
-PHONY: test unittests flaketest
+PHONY: test unittests flaketest checkmanifest checksetup clean build release
 
 test: unittests flaketest checkmanifest checksetup
 
