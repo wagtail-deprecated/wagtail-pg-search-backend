@@ -19,9 +19,8 @@ from .utils import (
     ADD, AND, OR, WEIGHTS_VALUES, get_content_types_pks, get_descendant_models,
     get_postgresql_connections, get_weight, keyword_split, unidecode)
 
-# TODO: Add autocomplete.
 
-DEFAULT_SEARCH_CONFIGURATION = 'simple'
+# TODO: Add autocomplete.
 
 
 def get_db_alias(queryset):
@@ -76,8 +75,7 @@ class Index(object):
                            % (IndexEntry._meta.db_table, pks_sql), params)
 
     def get_config(self):
-        return self.backend.params.get('SEARCH_CONFIG',
-                                       DEFAULT_SEARCH_CONFIGURATION)
+        return self.backend.params.get('SEARCH_CONFIG')
 
     def prepare_value(self, value):
         if isinstance(value, string_types):
@@ -118,7 +116,9 @@ class Index(object):
     def add_items_upsert(self, connection, content_type_pk, objs, config):
         vectors_sql = []
         data_params = []
-        sql_template = "setweight(to_tsvector('%s', %%s), %%s)" % config
+        sql_template = ('to_tsvector(%s)' if config is None
+                        else "to_tsvector('%s', %%s)" % config)
+        sql_template = 'setweight(%s, %%s)' % sql_template
         for obj in objs:
             vectors_sql.append('||'.join(sql_template for _ in obj._body_))
             data_params.extend((content_type_pk, obj._object_id))
