@@ -176,6 +176,8 @@ class Index(object):
 
 
 class PostgresSearchQuery(BaseSearchQuery):
+    DEFAULT_OPERATOR = 'and'
+
     def __init__(self, *args, **kwargs):
         super(PostgresSearchQuery, self).__init__(*args, **kwargs)
         self.search_fields = self.queryset.model.get_search_fields()
