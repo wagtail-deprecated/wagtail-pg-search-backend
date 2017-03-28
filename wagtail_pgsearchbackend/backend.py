@@ -180,26 +180,14 @@ class PostgresSearchQuery(BaseSearchQuery):
         super(PostgresSearchQuery, self).__init__(*args, **kwargs)
         self.search_fields = self.queryset.model.get_search_fields()
 
-    def _process_lookup(self, field, lookup, value):
-        return Q(
-            **{field.get_attname(self.queryset.model) + '__' + lookup: value})
-
-    def _connect_filters(self, filters, connector, negated):
-        if not filters:
-            return Q()
-        combine = AND if connector == 'AND' else OR
-        q = combine(filters)
-        return ~q if negated else q
-
     def get_search_query(self, config):
-        combine = AND if self.operator == 'and' else OR
+        combine = OR if self.operator == 'or' else AND
         search_terms = keyword_split(unidecode(self.query_string))
         return combine(SearchQuery(q, config=config) for q in search_terms)
 
     def get_base_queryset(self):
-        queryset = self.queryset.filter(self._get_filters_from_queryset())
         # Removes order for performance’s sake.
-        return queryset.order_by()
+        return self.queryset.order_by()
 
     def get_in_index_queryset(self, queryset, search_query):
         return (IndexEntry._default_manager.using(get_db_alias(queryset))

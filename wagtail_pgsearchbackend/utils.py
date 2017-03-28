@@ -61,7 +61,7 @@ def cache_results(func):
 @cache_results
 def get_descendant_models(model):
     """
-    This returns all descendants of a model, including the model itself.
+    Returns all descendants of a model, including the model itself.
     """
     models = set([model])
     for other_model in apps.get_models():
