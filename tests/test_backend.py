@@ -13,7 +13,7 @@ class TestPgSearchBackend(BackendTests, TestCase):
 
         results = self.backend.search(None, SearchTest)
         # We find results anyway because we searched for nothing.
-        self.assertEqual(set(results),
+        self.assertSetEqual(set(results),
                          {self.testa, self.testb, self.testc.searchtest_ptr,
                           self.testd.searchtest_ptr})
 
@@ -21,7 +21,7 @@ class TestPgSearchBackend(BackendTests, TestCase):
         results = self.backend.search('hello', SearchTest)
         self.assertSetEqual(set(results), set())
         results = self.backend.search('world', SearchTest)
-        self.assertEqual(set(results), set())
+        self.assertSetEqual(set(results), set())
 
         # Run update_index command
         with self.ignore_deprecation_warnings():

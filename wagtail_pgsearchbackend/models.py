@@ -16,10 +16,6 @@ class IndexQuerySet(QuerySet):
         return self.filter(
             content_type_id__in=get_content_types_pks(models, self._db))
 
-    def for_objects(self, *objs):
-        return (self.for_models(*{obj._meta.model for obj in objs})
-                .filter(object_id__in=[force_text(obj.pk) for obj in objs]))
-
     def for_model(self, model):
         return self.filter(
             content_type_id=get_content_types_pks((model,), self._db)[0])
