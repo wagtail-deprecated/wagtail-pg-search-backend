@@ -1,7 +1,10 @@
+from functools import partial, reduce
+import operator
 import re
 
 from django.apps import apps
 from django.db import connections
+from django.db.models import Q
 from wagtail.wagtailsearch.index import Indexed, RelatedFields, SearchField
 
 try:
@@ -15,6 +18,14 @@ except ImportError:
 def get_postgresql_connections():
     return [connection for connection in connections.all()
             if connection.vendor == 'postgresql']
+
+
+# Reduce any iterable to a single value using a logical OR e.g. (a | b | ...)
+OR = partial(reduce, operator.or_)
+# Reduce any iterable to a single value using a logical AND e.g. (a & b & ...)
+AND = partial(reduce, operator.and_)
+# Reduce any iterable to a single value using an addition
+ADD = partial(reduce, operator.add)
 
 
 def keyword_split(keywords):
@@ -36,13 +47,25 @@ def keyword_split(keywords):
     return [match[0] or match[1] or match[2] for match in matches]
 
 
-def get_ancestor_models(model):
+def get_descendant_models(model):
     """
-    This returns all ancestors of a model, including the model itself.
+    This returns all descendants of a model, including the model itself.
     """
-    models = [model]
-    models.extend(model._meta.parents)
+    models = set([model])
+    for other_model in apps.get_models():
+        if model in other_model._meta.parents:
+            models.add(other_model)
     return models
+
+
+def get_content_types_pks(models, db_alias):
+    # We import it locally because this file is loaded before apps are ready.
+    from django.contrib.contenttypes.models import ContentType
+    return (ContentType._default_manager.using(db_alias)
+            .filter(OR([Q(app_label=model._meta.app_label,
+                          model=model._meta.model_name)
+                        for model in models]))
+            .values_list('pk', flat=True))
 
 
 def get_search_fields(search_fields):

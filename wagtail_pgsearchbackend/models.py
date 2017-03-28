@@ -8,27 +8,26 @@ from django.db.models.functions import Cast
 from django.utils.encoding import force_text, python_2_unicode_compatible
 from django.utils.translation import ugettext_lazy as _
 
-from .utils import WEIGHTS_VALUES, get_ancestor_models
+from .utils import WEIGHTS_VALUES, get_content_types_pks, get_descendant_models
 
 
 class IndexQuerySet(QuerySet):
     def for_models(self, *models):
-        content_types = (ContentType.default_manager.using(self._db)
-                         .get_for_models(*models).values())
-        return self.filter(content_type__in=content_types)
+        return self.filter(
+            content_type_id__in=get_content_types_pks(models, self._db))
 
     def for_objects(self, *objs):
         return (self.for_models(*{obj._meta.model for obj in objs})
                 .filter(object_id__in=[force_text(obj.pk) for obj in objs]))
 
     def for_model(self, model):
-        return self.filter(content_type=ContentType.default_manager
-                           .using(self._db).get_for_model(model))
+        return self.filter(
+            content_type_id=get_content_types_pks((model,), self._db)[0])
 
     def for_object(self, obj):
         db_alias = obj._state.db
         return (self.using(db_alias)
-                .for_models(*get_ancestor_models(obj._meta.model))
+                .for_models(*get_descendant_models(obj._meta.model))
                 .filter(object_id=force_text(obj.pk)))
 
     def add_rank(self, search_query):
