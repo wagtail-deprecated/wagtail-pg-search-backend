@@ -174,9 +174,9 @@ class Index(object):
     def add_items(self, model, objs):
         content_types_pks = (
             ContentType.default_manager.using(self.db_alias)
-            .filter(OR([Q(app_label=model._meta.app_label,
-                          model=model._meta.model_name)
-                        for model in get_ancestor_models(model)]))
+            .filter(OR([Q(app_label=ancestor_model._meta.app_label,
+                          model=ancestor_model._meta.model_name)
+                        for ancestor_model in get_ancestor_models(model)]))
             .values_list('pk', flat=True))
         config = self.get_config()
         for obj in objs:
