@@ -64,8 +64,6 @@ with most features mentioned in the the
 Known limitations
 ~~~~~~~~~~~~~~~~~
 
-* Multiple databases are not handled properly.
-
 * ``SearchField.partial_match`` behaviour is not implemented.
 
 * Due to a PostgreSQL limitation, ``SearchField.boost`` is only partially
