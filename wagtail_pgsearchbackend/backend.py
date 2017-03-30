@@ -1,6 +1,6 @@
 # coding: utf-8
 
-from __future__ import unicode_literals
+from __future__ import absolute_import, unicode_literals
 
 from django.contrib.postgres.search import (
     SearchQuery, SearchRank, SearchVector)
@@ -138,9 +138,9 @@ class Index(object):
     def add_items_update_then_create(self, content_type_pk, objs, config):
         ids_and_objs = {}
         for obj in objs:
-            obj._search_vector_ = ADD([
+            obj._search_vector = ADD([
                 SearchVector(Value(text), weight=weight, config=config)
-                for text, weight in obj._body_])
+                for text, weight in obj._body_]) if obj._body_ else None
             ids_and_objs[obj._object_id] = obj
         index_entries = IndexEntry._default_manager.using(self.db_alias)
         index_entries_for_ct = index_entries.filter(
@@ -151,14 +151,14 @@ class Index(object):
         for indexed_id in indexed_ids:
             obj = ids_and_objs[indexed_id]
             index_entries_for_ct.filter(object_id=obj._object_id) \
-                .update(body_search=obj._search_vector_)
+                .update(body_search=obj._search_vector)
         to_be_created = []
         for object_id in ids_and_objs:
             if object_id not in indexed_ids:
                 to_be_created.append(IndexEntry(
                     content_type_id=content_type_pk,
                     object_id=object_id,
-                    body_search=ids_and_objs[object_id]._search_vector_,
+                    body_search=ids_and_objs[object_id]._search_vector,
                 ))
         index_entries.bulk_create(to_be_created)
 
@@ -188,6 +188,8 @@ class PostgresSearchQuery(BaseSearchQuery):
     def get_search_query(self, config):
         combine = OR if self.operator == 'or' else AND
         search_terms = keyword_split(unidecode(self.query_string))
+        if not search_terms:
+            return SearchQuery('')
         return combine(SearchQuery(q, config=config) for q in search_terms)
 
     def get_base_queryset(self):
@@ -229,6 +231,8 @@ class PostgresSearchQuery(BaseSearchQuery):
                 return field.boost
 
     def get_in_fields_queryset(self, queryset, search_query):
+        if not self.fields:
+            return queryset.none()
         return (
             queryset.annotate(
                 _search_=ADD(

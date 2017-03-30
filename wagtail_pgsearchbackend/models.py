@@ -1,3 +1,5 @@
+from __future__ import absolute_import, unicode_literals
+
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.search import SearchRank, SearchVectorField
@@ -13,6 +15,8 @@ from .utils import WEIGHTS_VALUES, get_content_types_pks, get_descendant_models
 
 class IndexQuerySet(QuerySet):
     def for_models(self, *models):
+        if not models:
+            return self.none()
         return self.filter(
             content_type_id__in=get_content_types_pks(models, self._db))
 
