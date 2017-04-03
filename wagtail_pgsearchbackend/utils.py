@@ -57,7 +57,7 @@ def get_descendant_models(model):
     """
     models = set([model])
     for other_model in apps.get_models():
-        if model in other_model._meta.parents:
+        if issubclass(other_model, model):
             models.add(other_model)
     return models
 
