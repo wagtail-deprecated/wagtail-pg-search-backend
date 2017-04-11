@@ -6,8 +6,9 @@ from django.contrib.postgres.search import (
     SearchQuery, SearchRank, SearchVector)
 from django.db import (
     DEFAULT_DB_ALIAS, NotSupportedError, connections, transaction)
-from django.db.models import F, Manager, Value
+from django.db.models import F, Manager, TextField, Value
 from django.db.models.constants import LOOKUP_SEP
+from django.db.models.functions import Cast
 from django.utils.encoding import force_text, python_2_unicode_compatible
 from django.utils.six import string_types
 from wagtail.wagtailsearch.backends.base import (
@@ -16,7 +17,7 @@ from wagtail.wagtailsearch.index import RelatedFields, SearchField
 
 from .models import IndexEntry
 from .utils import (
-    ADD, AND, OR, WEIGHTS_VALUES, get_content_types_pks, get_descendant_models,
+    ADD, AND, OR, WEIGHTS_VALUES, get_content_types_pks,
     get_postgresql_connections, get_weight, keyword_split, unidecode)
 
 
@@ -57,22 +58,13 @@ class Index(object):
         pass
 
     def delete_stale_entries(self):
-        qs1 = (IndexEntry._default_manager.using(self.db_alias)
-               .for_model(self.model).pks())
-        # The empty `order_by` removes the order for performance’s sake.
-        qs2 = (self.model._default_manager.using(self.db_alias)
-               .order_by().values('pk'))
-        sql1, params1 = get_sql(qs1)
-        sql2, params2 = get_sql(qs2)
-        pks_sql = '(%s) EXCEPT (%s)' % (sql1, sql2)
-        params = params1 + params2
-        with connections[get_db_alias(qs1)].cursor() as cursor:
-            cursor.execute('SELECT EXISTS (%s);' % pks_sql, params)
-            has_stale_entries = cursor.fetchone()[0]
-            if not has_stale_entries:
-                return
-            cursor.execute('DELETE FROM %s WHERE object_id IN (%s);'
-                           % (IndexEntry._meta.db_table, pks_sql), params)
+        existing_pks = (self.model._default_manager.using(self.db_alias)
+                        .annotate(object_id=Cast('pk', TextField()))
+                        .values('object_id'))
+        stale_entries = (IndexEntry._default_manager.using(self.db_alias)
+                         .for_models(self.model)
+                         .exclude(object_id__in=existing_pks))
+        stale_entries.delete()
 
     def get_config(self):
         return self.backend.params.get('SEARCH_CONFIG')
@@ -200,8 +192,7 @@ class PostgresSearchQuery(BaseSearchQuery):
 
     def get_in_index_queryset(self, queryset, search_query):
         return (IndexEntry._default_manager.using(get_db_alias(queryset))
-                .for_models(*get_descendant_models(queryset.model))
-                .filter(body_search=search_query))
+                .for_models(queryset.model).filter(body_search=search_query))
 
     def get_in_index_count(self, queryset, search_query):
         index_sql, index_params = get_sql(
