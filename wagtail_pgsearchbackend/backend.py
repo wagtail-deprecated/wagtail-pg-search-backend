@@ -58,6 +58,10 @@ class Index(object):
         pass
 
     def delete_stale_entries(self):
+        if self.model._meta.parents:
+            # We don’t need to delete stale entries for non-root models,
+            # since we already delete them by deleting roots.
+            return
         existing_pks = (self.model._default_manager.using(self.db_alias)
                         .annotate(object_id=Cast('pk', TextField()))
                         .values('object_id'))
