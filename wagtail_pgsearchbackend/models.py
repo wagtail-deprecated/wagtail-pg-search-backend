@@ -64,7 +64,7 @@ class IndexEntry(Model):
         # TODO: Move here the GIN index from the migration.
 
     def __str__(self):
-        return '%s: %s' % (self.content_type.name, self.title)
+        return '%s: %s' % (self.content_type.name, self.content_object)
 
     @property
     def model(self):
