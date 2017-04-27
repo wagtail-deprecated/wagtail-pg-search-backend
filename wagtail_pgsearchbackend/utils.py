@@ -106,12 +106,12 @@ def determine_boosts_weights():
     max_boost = max(boosts)
     boost_step = (max_boost - min_boost) / WEIGHTS_COUNT
     return [(min_boost + (i * boost_step), weight)
-            for i, weight in zip(range(WEIGHTS_COUNT), WEIGHTS)]
+            for i, weight in zip(range(WEIGHTS_COUNT), reversed(WEIGHTS))]
 
 
 def get_weight(boost):
     if boost is None:
         boost = 0
-    for max_boost, weight in BOOSTS_WEIGHTS:
+    for max_boost, weight in reversed(BOOSTS_WEIGHTS):
         if boost >= max_boost:
             return weight
