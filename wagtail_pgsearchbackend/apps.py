@@ -1,3 +1,5 @@
+from __future__ import division
+
 from django.apps import AppConfig
 from django.core.checks import Error, Tags, register
 
