@@ -60,6 +60,10 @@ class TestPgSearchBackend(BackendTests, TestCase):
                              [(-1, 'A'), (-1, 'B'), (-1, 'C'), (-1, 'D')])
         self.assertListEqual(determine_boosts_weights([-1, 1, 2]),
                              [(2, 'A'), (1, 'B'), (-1, 'C'), (-1, 'D')])
+        self.assertListEqual(determine_boosts_weights([0, 1, 2, 3]),
+                             [(3, 'A'), (2, 'B'), (1, 'C'), (0, 'D')])
+        self.assertListEqual(determine_boosts_weights([0, 0.25, 0.75, 1, 1.5]),
+                             [(1.5, 'A'), (1, 'B'), (0.5, 'C'), (0, 'D')])
         self.assertListEqual(determine_boosts_weights([0, 1, 2, 3, 4, 5, 6]),
                              [(6, 'A'), (4, 'B'), (2, 'C'), (0, 'D')])
         self.assertListEqual(determine_boosts_weights([-2, -1, 0, 1, 2, 3, 4]),
