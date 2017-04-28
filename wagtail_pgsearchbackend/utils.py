@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import operator
 import re
 from functools import partial, reduce
+from itertools import zip_longest
 
 from django.apps import apps
 from django.db import connections
@@ -93,25 +94,34 @@ BOOSTS_WEIGHTS = []
 WEIGHTS_VALUES = []
 
 
-def determine_boosts_weights():
+def get_boosts():
     boosts = set()
     for model in apps.get_models():
         if issubclass(model, Indexed):
             for search_field in get_search_fields(model.get_search_fields()):
                 boost = search_field.boost
-                boosts.add(0 if boost is None else boost)
+                if boost is not None:
+                    boosts.add(boost)
+    return boosts
+
+
+def determine_boosts_weights(boosts=()):
+    if not boosts:
+        boosts = get_boosts()
+    boosts = list(sorted(boosts, reverse=True))
+    min_boost = boosts[-1]
     if len(boosts) <= WEIGHTS_COUNT:
-        return zip(reversed(sorted(boosts)), WEIGHTS)
-    min_boost = min(boosts)
-    max_boost = max(boosts)
-    boost_step = (max_boost - min_boost) / WEIGHTS_COUNT
-    return [(min_boost + (i * boost_step), weight)
-            for i, weight in zip(range(WEIGHTS_COUNT), WEIGHTS)]
+        return list(zip_longest(boosts, WEIGHTS, fillvalue=min(min_boost, 0)))
+    max_boost = boosts[0]
+    boost_step = (max_boost - min_boost) / (WEIGHTS_COUNT - 1)
+    return [(max_boost - (i * boost_step), weight)
+            for i, weight in enumerate(WEIGHTS)]
 
 
 def get_weight(boost):
     if boost is None:
-        boost = 0
+        return WEIGHTS[-1]
     for max_boost, weight in BOOSTS_WEIGHTS:
         if boost >= max_boost:
             return weight
+    return weight
