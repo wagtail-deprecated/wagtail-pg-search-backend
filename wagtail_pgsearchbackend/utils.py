@@ -3,12 +3,12 @@ from __future__ import absolute_import
 import operator
 import re
 from functools import partial, reduce
-from itertools import zip_longest
 
 from django.apps import apps
 from django.db import connections
 from django.db.models import Q
 from django.utils.lru_cache import lru_cache
+from django.utils.six.moves import zip_longest
 from wagtail.wagtailsearch.index import Indexed, RelatedFields, SearchField
 
 try:
