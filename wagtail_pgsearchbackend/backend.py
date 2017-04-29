@@ -251,7 +251,7 @@ class PostgresSearchQuery(BaseSearchQuery):
             index_entries = index_entries.rank(search_query)
         index_sql, index_params = get_sql(
             index_entries.annotate_typed_pk()
-            .values_list('typed_pk', 'rank')
+            .values('typed_pk', 'rank')
         )
         model_sql, model_params = get_sql(queryset)
         model = queryset.model
