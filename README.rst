@@ -1,3 +1,7 @@
+*Archived* - This search backend is now `included in Wagtail`_.
+
+.. _included in Wagtail: https://docs.wagtail.io/en/stable/reference/contrib/postgres_search.html
+
 Wagtail PostgreSQL full text search backend
 ===========================================
 
